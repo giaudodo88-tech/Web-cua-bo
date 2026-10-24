@@ -1,0 +1,2292 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DHK — Mô phỏng nguyên tử 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg:#0a0a0a; --bg-2:#141414; --bg-3:#1c1c1c;
+    --border:#262626; --border-hi:#3a3a3a;
+    --orange:#ff6b1a; --orange-bright:#ff8c42; --orange-soft:#cc7744;
+    --text:#e8e8e8; --text-dim:#777; --text-mute:#555;
+    --danger:#d94444; --green:#3fbf5f; --blue:#3f8fdf; --yellow:#dfbf3f;
+  }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100vh; overflow: hidden;
+  }
+  body { display:flex; flex-direction:column; touch-action:none;
+    font-size:14px; -webkit-font-smoothing:antialiased; }
+
+  header { display:flex; align-items:center; justify-content:space-between;
+    padding:14px 24px; background:var(--bg);
+    border-bottom:1px solid var(--border); z-index:10; flex-shrink:0; }
+  .logo { font-size:22px; font-weight:800; letter-spacing:4px;
+    cursor:pointer; color:var(--orange);
+    text-shadow:0 0 12px rgba(255,107,26,0.5);
+    transition:all 0.2s; user-select:none; }
+  .logo:hover { color:var(--orange-bright); }
+  .header-right { display:flex; align-items:center; gap:10px; }
+  .lang-select {
+    background:var(--bg-2); color:var(--text);
+    border:1px solid var(--border); padding:7px 12px;
+    border-radius:6px; cursor:pointer; font-size:13px;
+    outline:none; transition:border 0.2s; font-family:inherit;
+  }
+  .lang-select:hover { border-color:var(--orange); }
+  .lang-select option { background:var(--bg-2); }
+  .menu-btn { background:var(--bg-2); border:1px solid var(--border);
+    border-radius:6px; width:38px; height:38px;
+    display:flex; flex-direction:column; justify-content:center;
+    align-items:center; gap:4px; cursor:pointer; transition:all 0.2s; }
+  .menu-btn:hover { border-color:var(--orange); background:rgba(255,107,26,0.08); }
+  .menu-btn span { width:16px; height:1.5px; background:var(--text);
+    border-radius:1px; transition:background 0.2s; }
+  .menu-btn:hover span { background:var(--orange); }
+
+  main { flex:1; display:flex; flex-direction:column;
+    padding:16px 24px; gap:12px; overflow:hidden; min-height:0; }
+
+  .search-wrap { display:flex; justify-content:center; flex-shrink:0; }
+  .search-box { width:100%; max-width:720px; position:relative; }
+  .search-box input {
+    width:100%; background:var(--bg-2); border:1px solid var(--border);
+    color:var(--text); padding:14px 48px 14px 18px;
+    border-radius:8px; font-size:15px; outline:none;
+    transition:all 0.2s; font-family:inherit;
+  }
+  .search-box input::placeholder { color:var(--text-mute); }
+  .search-box input:focus {
+    border-color:var(--orange); background:var(--bg-3);
+    box-shadow:0 0 0 3px rgba(255,107,26,0.12);
+  }
+  .search-box .clear-btn {
+    position:absolute; right:12px; top:50%;
+    transform:translateY(-50%); background:none; border:none;
+    color:var(--text-dim); font-size:20px; cursor:pointer;
+    line-height:1; padding:4px 8px; border-radius:4px; display:none;
+  }
+  .search-box.has-value .clear-btn { display:block; }
+  .clear-btn:hover { color:var(--orange); background:rgba(255,107,26,0.1); }
+
+  .suggestions {
+    position:absolute; top:calc(100% + 6px); left:0; right:0;
+    background:var(--bg-3); border:1px solid var(--border-hi);
+    border-radius:8px; overflow:hidden; z-index:20;
+    display:none; max-height:300px; overflow-y:auto;
+    box-shadow:0 8px 24px rgba(0,0,0,0.6);
+  }
+  .suggestions.show { display:block; }
+  .sug-item {
+    padding:10px 16px; cursor:pointer; font-size:13.5px;
+    border-bottom:1px solid var(--border);
+    transition:background 0.15s;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .sug-item:last-child { border-bottom:none; }
+  .sug-item:hover { background:rgba(255,107,26,0.12); color:var(--orange-bright); }
+  .sug-item .sug-formula { color:var(--text-dim);
+    font-family:monospace; font-size:12.5px; }
+  .sug-item .sug-z { color:var(--text-mute);
+    font-family:monospace; font-size:11px; margin-right:8px; }
+
+  .view-tabs { display:flex; gap:4px; justify-content:center;
+    flex-wrap:wrap; flex-shrink:0; }
+  .view-tab {
+    background:transparent; border:1px solid var(--border);
+    color:var(--text-dim); padding:7px 16px;
+    border-radius:6px; font-size:12.5px;
+    cursor:pointer; transition:all 0.15s;
+    white-space:nowrap; font-family:inherit; letter-spacing:0.3px;
+  }
+  .view-tab:hover { border-color:var(--border-hi); color:var(--text); }
+  .view-tab.active {
+    background:rgba(255,107,26,0.12);
+    color:var(--orange); border-color:var(--orange);
+  }
+
+  .canvas-wrap {
+    flex:1; position:relative;
+    border:1px solid var(--border); border-radius:12px;
+    overflow:hidden; background:#050505;
+    min-height:0; cursor:grab;
+  }
+  .canvas-wrap:active { cursor:grabbing; }
+  #canvas3d { width:100%; height:100%; display:block; }
+
+  .empty-state {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    justify-content:center; align-items:center;
+    gap:14px; pointer-events:none;
+    transition:opacity 0.4s; padding:0 20px;
+  }
+  .empty-state.hide { opacity:0; }
+  .empty-state .symbol { font-size:56px; font-weight:200;
+    color:var(--border-hi); letter-spacing:6px;
+    font-family:'Courier New', monospace; }
+  .empty-state .msg { color:var(--text-mute); font-size:13.5px;
+    text-align:center; max-width:420px; line-height:1.6; }
+  .empty-state .examples { display:flex; gap:6px; flex-wrap:wrap;
+    justify-content:center; margin-top:8px; pointer-events:auto; }
+  .empty-state .ex-chip {
+    background:transparent; border:1px solid var(--border);
+    color:var(--text-dim); padding:5px 12px;
+    border-radius:4px; font-size:12px; cursor:pointer;
+    transition:all 0.15s; font-family:inherit;
+  }
+  .empty-state .ex-chip:hover { border-color:var(--orange); color:var(--orange); }
+
+  .toast {
+    position:absolute; bottom:20px; left:50%;
+    transform:translateX(-50%) translateY(80px);
+    background:var(--bg-3); border:1px solid var(--danger);
+    color:var(--text); padding:10px 18px;
+    border-radius:6px; font-size:13px;
+    transition:transform 0.3s; pointer-events:none;
+    z-index:5; max-width:90%;
+    box-shadow:0 4px 16px rgba(0,0,0,0.5);
+  }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+
+  .hint {
+    position:absolute; bottom:12px; left:12px;
+    color:var(--text-mute); font-size:11.5px;
+    background:rgba(0,0,0,0.7); padding:6px 10px;
+    border-radius:4px; border:1px solid var(--border);
+    pointer-events:none; transition:opacity 0.5s;
+    font-family:'Courier New', monospace; letter-spacing:0.3px;
+  }
+  .hint.hide { opacity:0; }
+
+  .info-panel {
+    position:absolute; top:12px; right:12px;
+    width:240px; background:rgba(20,20,20,0.96);
+    border:1px solid var(--border-hi);
+    border-radius:8px; padding:14px;
+    transform:translateX(280px); transition:transform 0.3s;
+    z-index:6; backdrop-filter:blur(8px);
+  }
+  .info-panel.show { transform:translateX(0); }
+  .info-panel h4 {
+    color:var(--orange); font-size:15px;
+    margin-bottom:10px; display:flex;
+    justify-content:space-between; align-items:center;
+    font-weight:600; letter-spacing:1px;
+  }
+  .info-panel .close-info {
+    background:none; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:16px; line-height:1;
+    padding:2px 6px; border-radius:3px;
+  }
+  .info-panel .close-info:hover { color:var(--orange); }
+  .info-panel .info-row {
+    display:flex; justify-content:space-between;
+    font-size:12.5px; padding:5px 0;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .info-panel .info-row:last-child { border-bottom:none; }
+  .info-panel .info-label { color:var(--text-dim); }
+  .info-panel .info-value { color:var(--text);
+    font-family:'Courier New', monospace; font-size:12px;
+    text-align:right; }
+
+  .toolbar {
+    display:flex; gap:6px; justify-content:center;
+    flex-wrap:wrap; flex-shrink:0;
+  }
+  .tool-btn {
+    background:var(--bg-2); border:1px solid var(--border);
+    color:var(--text-dim); padding:9px 18px;
+    border-radius:6px; font-size:12.5px;
+    cursor:pointer; transition:all 0.15s;
+    font-family:inherit; letter-spacing:0.5px;
+  }
+  .tool-btn:hover { border-color:var(--border-hi);
+    color:var(--text); background:var(--bg-3); }
+  .tool-btn.active {
+    background:rgba(255,107,26,0.15);
+    color:var(--orange); border-color:var(--orange);
+  }
+  .tool-btn.highlight {
+    background:rgba(255,107,26,0.12);
+    color:var(--orange); border-color:var(--orange);
+  }
+  .tool-btn.highlight:hover {
+    background:rgba(255,107,26,0.22);
+    color:var(--orange-bright);
+  }
+
+  /* === MECHANISM PANEL === */
+  .mech-panel {
+    position:absolute; left:12px; top:12px;
+    width:290px; max-height:calc(100% - 24px);
+    background:rgba(15,15,15,0.96);
+    border:1px solid var(--orange);
+    border-radius:8px; padding:0;
+    transform:translateX(-320px); transition:transform 0.3s;
+    z-index:7; backdrop-filter:blur(10px);
+    display:flex; flex-direction:column;
+    box-shadow:0 0 30px rgba(255,107,26,0.2);
+  }
+  .mech-panel.show { transform:translateX(0); }
+  .mech-header {
+    padding:14px 16px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between;
+    align-items:center; flex-shrink:0;
+  }
+  .mech-header h4 { color:var(--orange); font-size:14px;
+    font-weight:600; letter-spacing:1px; }
+  .mech-header .close-mech {
+    background:none; border:none; color:var(--text-dim);
+    cursor:pointer; font-size:18px; line-height:1;
+    padding:2px 6px; border-radius:3px;
+  }
+  .mech-header .close-mech:hover { color:var(--orange); }
+  .mech-body {
+    padding:14px 16px; overflow-y:auto; flex:1;
+    font-size:13px; line-height:1.6;
+  }
+  .mech-title {
+    color:var(--text); font-size:15px; font-weight:600;
+    margin-bottom:4px;
+  }
+  .mech-formula {
+    color:var(--orange); font-family:'Courier New', monospace;
+    font-size:14px; margin-bottom:14px;
+    padding:8px 12px; background:rgba(255,107,26,0.08);
+    border-radius:6px; border-left:3px solid var(--orange);
+  }
+  .mech-step {
+    padding:10px 12px; margin-bottom:8px;
+    background:rgba(255,255,255,0.03);
+    border-left:2px solid var(--border-hi);
+    border-radius:4px; cursor:pointer;
+    transition:all 0.2s;
+  }
+  .mech-step:hover {
+    background:rgba(255,107,26,0.08);
+    border-left-color:var(--orange);
+  }
+  .mech-step.active {
+    background:rgba(255,107,26,0.12);
+    border-left-color:var(--orange);
+  }
+  .mech-step .step-num {
+    color:var(--orange); font-family:'Courier New', monospace;
+    font-size:11px; font-weight:700;
+    margin-right:6px;
+  }
+  .mech-step .step-title {
+    color:var(--text); font-weight:600;
+    font-size:12.5px; margin-bottom:4px;
+  }
+  .mech-step .step-desc {
+    color:var(--text-dim); font-size:12px;
+    line-height:1.5;
+  }
+  .mech-controls {
+    padding:10px 16px; border-top:1px solid var(--border);
+    display:flex; gap:6px; justify-content:space-between;
+    flex-shrink:0;
+  }
+  .mech-controls button {
+    flex:1; background:var(--bg-2);
+    border:1px solid var(--border); color:var(--text-dim);
+    padding:8px; border-radius:5px;
+    font-size:12px; cursor:pointer;
+    transition:all 0.15s; font-family:inherit;
+  }
+  .mech-controls button:hover {
+    border-color:var(--orange); color:var(--orange);
+  }
+  .mech-controls button:disabled {
+    opacity:0.3; cursor:not-allowed;
+  }
+  .mech-progress {
+    padding:0 16px 12px;
+    display:flex; gap:3px;
+  }
+  .mech-progress .bar {
+    flex:1; height:3px;
+    background:var(--border);
+    border-radius:2px;
+    transition:background 0.3s;
+  }
+  .mech-progress .bar.done { background:var(--orange); }
+
+  /* === SIDEBAR === */
+  .sidebar {
+    position:fixed; top:0; right:-340px;
+    width:320px; height:100%;
+    background:var(--bg-2); border-left:1px solid var(--border);
+    padding:0; transition:right 0.3s ease;
+    z-index:100; overflow-y:auto;
+  }
+  .sidebar.open { right:0; }
+  .sidebar-header {
+    display:flex; justify-content:space-between;
+    align-items:center; padding:20px 24px;
+    border-bottom:1px solid var(--border);
+  }
+  .sidebar-header h3 {
+    color:var(--text); font-size:13px;
+    font-weight:600; letter-spacing:3px;
+    text-transform:uppercase;
+  }
+  .sidebar-close {
+    background:none; border:none; color:var(--text-dim);
+    font-size:20px; cursor:pointer; line-height:1;
+    padding:4px 8px; border-radius:4px;
+  }
+  .sidebar-close:hover { color:var(--orange); background:rgba(255,107,26,0.1); }
+  .acc-item { border-bottom:1px solid var(--border); }
+  .acc-header {
+    display:flex; justify-content:space-between;
+    align-items:center; padding:16px 24px;
+    cursor:pointer; color:var(--text);
+    font-size:13.5px; user-select:none;
+    transition:background 0.15s;
+  }
+  .acc-header:hover { background:var(--bg-3); color:var(--orange); }
+  .acc-header .arrow {
+    color:var(--text-mute); font-size:10px;
+    transition:transform 0.3s;
+  }
+  .acc-item.open .acc-header .arrow { transform:rotate(90deg); color:var(--orange); }
+  .acc-body {
+    max-height:0; overflow:hidden;
+    transition:max-height 0.35s ease;
+  }
+  .acc-item.open .acc-body { max-height:2000px; }
+  .acc-body-inner {
+    padding:0 24px 16px 24px;
+    color:var(--text-dim); font-size:13px;
+    line-height:1.7;
+  }
+  .acc-body-inner p { margin-bottom:8px; }
+  .acc-body-inner .key {
+    color:var(--orange-soft);
+    font-family:'Courier New', monospace; font-size:12px;
+  }
+  .ptable-grid {
+    display:grid; grid-template-columns:repeat(6, 1fr);
+    gap:4px; padding:4px 0;
+  }
+  .ptable-cell {
+    background:var(--bg-3); border:1px solid var(--border);
+    border-radius:4px; padding:6px 4px;
+    text-align:center; cursor:pointer;
+    transition:all 0.15s; font-size:11px;
+  }
+  .ptable-cell:hover {
+    border-color:var(--orange);
+    background:rgba(255,107,26,0.1);
+    transform:scale(1.05);
+  }
+  .ptable-cell .sym {
+    display:block; font-weight:700;
+    color:var(--text); font-size:13px;
+  }
+  .ptable-cell .z {
+    display:block; color:var(--text-mute);
+    font-size:9px; font-family:monospace;
+  }
+  .overlay {
+    position:fixed; inset:0;
+    background:rgba(0,0,0,0.7);
+    opacity:0; pointer-events:none;
+    transition:opacity 0.3s; z-index:99;
+  }
+  .overlay.open { opacity:1; pointer-events:auto; }
+
+  @media (max-width: 640px) {
+    header { padding:12px 16px; }
+    .logo { font-size:18px; letter-spacing:3px; }
+    .lang-select { font-size:12px; padding:6px 8px; }
+    main { padding:12px; gap:10px; }
+    .tool-btn { padding:8px 12px; font-size:11.5px; }
+    .view-tab { padding:6px 10px; font-size:11px; }
+    .sidebar { width:300px; right:-320px; }
+    .info-panel { width:190px; padding:10px; }
+    .info-panel .info-row { font-size:11.5px; }
+    .hint { font-size:10px; padding:4px 8px; }
+    .empty-state .symbol { font-size:40px; }
+    .ptable-grid { grid-template-columns:repeat(5, 1fr); }
+    .mech-panel { width:calc(100% - 24px); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="location.reload()">DHK</div>
+  <div class="header-right">
+    <select class="lang-select" id="langSelect" onchange="changeLang(this.value)"></select>
+    <button class="menu-btn" onclick="toggleMenu()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="search-wrap">
+    <div class="search-box" id="searchBox">
+      <input type="text" id="formulaInput" autocomplete="off">
+      <button class="clear-btn" onclick="clearInput()" aria-label="Xóa">×</button>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+  </div>
+
+  <div class="view-tabs" id="viewTabs">
+    <button class="view-tab active" data-view="ball" onclick="setView('ball')" data-i18n="view_ball">Ball 3D</button>
+    <button class="view-tab" data-view="wire" onclick="setView('wire')" data-i18n="view_wire">Wireframe</button>
+    <button class="view-tab" data-view="nucleus" onclick="setView('nucleus')" data-i18n="view_nucleus">Hạt nhân</button>
+    <button class="view-tab" data-view="shell" onclick="setView('shell')" data-i18n="view_shell">Electron shell</button>
+    <button class="view-tab" data-view="cloud" onclick="setView('cloud')" data-i18n="view_cloud">Đám mây e</button>
+    <button class="view-tab" data-view="slice" onclick="setView('slice')" data-i18n="view_slice">Mặt cắt</button>
+  </div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="canvas3d"></canvas>
+
+    <div class="empty-state" id="emptyState">
+      <div class="symbol">[  ]</div>
+      <div class="msg" id="emptyMsg"></div>
+      <div class="examples">
+        <button class="ex-chip" onclick="quickSearch('H2O')">H2O</button>
+        <button class="ex-chip" onclick="quickSearch('CH4')">CH4</button>
+        <button class="ex-chip" onclick="quickSearch('C6H6')">C6H6</button>
+        <button class="ex-chip" onclick="quickSearch('Fe2O3')">Fe2O3</button>
+        <button class="ex-chip" onclick="quickSearch('CH4+O2')">CH4+O2</button>
+      </div>
+    </div>
+
+    <div class="hint" id="hint"></div>
+    <div class="toast" id="toast"></div>
+
+    <div class="info-panel" id="infoPanel">
+      <h4><span id="infoTitle">—</span>
+        <button class="close-info" onclick="hideInfo()">×</button>
+      </h4>
+      <div id="infoBody"></div>
+    </div>
+
+    <!-- Mechanism panel -->
+    <div class="mech-panel" id="mechPanel">
+      <div class="mech-header">
+        <h4 id="mechHeaderTitle">Cơ chế</h4>
+        <button class="close-mech" onclick="closeMech()">×</button>
+      </div>
+      <div class="mech-body" id="mechBody"></div>
+      <div class="mech-progress" id="mechProgress"></div>
+      <div class="mech-controls">
+        <button id="mechPrev" onclick="mechPrev()">◀ Trước</button>
+        <button id="mechPlay" onclick="mechPlayPause()">Phát</button>
+        <button id="mechNext" onclick="mechNext()">Sau ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="tool-btn" id="btnRotate" onclick="toggleRotate()"></button>
+    <button class="tool-btn" id="btnMech" onclick="toggleMechFromBtn()" style="display:none"></button>
+    <button class="tool-btn" onclick="resetView()" data-i18n="btn_reset">Reset</button>
+    <button class="tool-btn" onclick="slowGen()" data-i18n="btn_slowgen">SlowGen</button>
+    <button class="tool-btn" onclick="screenshot()" data-i18n="btn_screenshot">Chụp ảnh</button>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" onclick="toggleMenu()"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h3 id="menuTitle">Menu</h3>
+    <button class="sidebar-close" onclick="toggleMenu()">×</button>
+  </div>
+  <div class="acc-item">
+    <div class="acc-header" onclick="toggleAcc(this)">
+      <span data-i18n="menu_home">Trang chủ</span><span class="arrow">▶</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p data-i18n="menu_home_desc">Mô phỏng nguyên tử và phân tử 3D.</p>
+      <p style="cursor:pointer;color:var(--orange-soft)" onclick="goHome()" data-i18n="menu_home_back">→ Về trang chủ</p>
+    </div></div>
+  </div>
+  <div class="acc-item">
+    <div class="acc-header" onclick="toggleAcc(this)">
+      <span data-i18n="menu_guide">Hướng dẫn</span><span class="arrow">▶</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner" id="guideBody"></div></div>
+  </div>
+  <div class="acc-item">
+    <div class="acc-header" onclick="toggleAcc(this)">
+      <span data-i18n="menu_periodic">Bảng tuần hoàn</span><span class="arrow">▶</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p style="font-size:12px;color:var(--text-mute);margin-bottom:8px" data-i18n="periodic_hint">Nhấn vào nguyên tố để xem</p>
+      <div class="ptable-grid" id="ptableGrid"></div>
+    </div></div>
+  </div>
+  <div class="acc-item">
+    <div class="acc-header" onclick="toggleAcc(this)">
+      <span data-i18n="menu_contact">Liên hệ</span><span class="arrow">▶</span>
+    </div>
+    <div class="acc-body"><div class="acc-body-inner">
+      <p>Email: contact@dhk.app</p>
+      <p style="color:var(--text-mute);margin-top:8px">© 2024 DHK</p>
+    </div></div>
+  </div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   I18N FULL — mọi key
+============================================================ */
+const LANGS = {
+  vi: {
+    label:'Tiếng Việt',
+    placeholder:'Nhập công thức, tên chất, hoặc nguyên tố...',
+    empty:'Nhập công thức, tên chất, hoặc tên nguyên tố để bắt đầu',
+    notFound:'Không tìm thấy: ',
+    menu:'Menu',
+    hint:'SCROLL: ZOOM · DRAG: ROTATE · CLICK: INFO',
+    rotateOn:'Tắt xoay', rotateOff:'Bật xoay',
+    btn_reset:'Reset', btn_slowgen:'SlowGen', btn_screenshot:'Chụp ảnh',
+    btn_mech:'Xem cơ chế', btn_reaction:'Xem phản ứng',
+    view_ball:'Ball 3D', view_wire:'Wireframe', view_nucleus:'Hạt nhân',
+    view_shell:'Electron shell', view_cloud:'Đám mây e', view_slice:'Mặt cắt',
+    menu_home:'Trang chủ', menu_guide:'Hướng dẫn', menu_periodic:'Bảng tuần hoàn',
+    menu_contact:'Liên hệ',
+    menu_home_desc:'Mô phỏng nguyên tử và phân tử 3D.',
+    menu_home_back:'→ Về trang chủ',
+    periodic_hint:'Nhấn vào nguyên tố để xem',
+    info_name:'Tên', info_en:'Tiếng Anh', info_Z:'Số hiệu Z',
+    info_N:'Neutron N', info_mass:'Khối lượng', info_shells:'Lớp e',
+    info_total_e:'Tổng e',
+    mech_header:'Cơ chế phản ứng',
+    mech_play:'Phát', mech_pause:'Tạm dừng',
+    mech_prev:'◀ Trước', mech_next:'Sau ▶',
+    mech_step:'Bước',
+    mech_no_steps:'Chưa có dữ liệu cơ chế cho chất này.',
+    guide_1:'Nhập công thức, tên chất, hoặc tên nguyên tố:',
+    guide_2:'Hỗ trợ công thức phức tạp: Ca(OH)2, CH3+CH3',
+    guide_3:'Phản ứng kết hợp (có dấu +) sẽ có nút "Xem phản ứng"',
+    guide_4:'Chất thường có nút "Xem cơ chế" nếu có dữ liệu',
+    guide_views:'Chế độ xem:',
+    element_names: { H:'Hydro', O:'Oxy', C:'Cacbon', N:'Nito', Na:'Natri',
+      Cl:'Clo', S:'Lưu huỳnh', P:'Photpho', Fe:'Sắt', Au:'Vàng', Cu:'Đồng',
+      Ca:'Canxi', K:'Kali', Mg:'Magie', Zn:'Kẽm' }
+  },
+  en: {
+    label:'English',
+    placeholder:'Enter formula, substance name, or element...',
+    empty:'Enter a formula, substance name, or element to start',
+    notFound:'Not found: ',
+    menu:'Menu',
+    hint:'SCROLL: ZOOM · DRAG: ROTATE · CLICK: INFO',
+    rotateOn:'Stop rotate', rotateOff:'Start rotate',
+    btn_reset:'Reset', btn_slowgen:'SlowGen', btn_screenshot:'Screenshot',
+    btn_mech:'View mechanism', btn_reaction:'View reaction',
+    view_ball:'Ball 3D', view_wire:'Wireframe', view_nucleus:'Nucleus',
+    view_shell:'Electron shell', view_cloud:'Electron cloud', view_slice:'Slice',
+    menu_home:'Home', menu_guide:'Guide', menu_periodic:'Periodic table',
+    menu_contact:'Contact',
+    menu_home_desc:'3D atom and molecule simulation.',
+    menu_home_back:'→ Back to home',
+    periodic_hint:'Tap an element to view',
+    info_name:'Name', info_en:'English', info_Z:'Atomic number Z',
+    info_N:'Neutron N', info_mass:'Mass', info_shells:'Shells',
+    info_total_e:'Total e',
+    mech_header:'Reaction mechanism',
+    mech_play:'Play', mech_pause:'Pause',
+    mech_prev:'◀ Prev', mech_next:'Next ▶',
+    mech_step:'Step',
+    mech_no_steps:'No mechanism data for this substance.',
+    guide_1:'Enter formula, substance name, or element:',
+    guide_2:'Supports complex formulas: Ca(OH)2, CH3+CH3',
+    guide_3:'Reactions (with +) have a "View reaction" button',
+    guide_4:'Substances show "View mechanism" if data available',
+    guide_views:'View modes:',
+    element_names: { H:'Hydrogen', O:'Oxygen', C:'Carbon', N:'Nitrogen',
+      Na:'Sodium', Cl:'Chlorine', S:'Sulfur', P:'Phosphorus', Fe:'Iron',
+      Au:'Gold', Cu:'Copper', Ca:'Calcium', K:'Potassium', Mg:'Magnesium',
+      Zn:'Zinc' }
+  },
+  ja: {
+    label:'日本語',
+    placeholder:'化学式、物質名、元素を入力...',
+    empty:'化学式、物質名、元素を入力してください',
+    notFound:'見つかりません: ',
+    menu:'メニュー',
+    hint:'スクロール: ズーム · ドラッグ: 回転 · クリック: 情報',
+    rotateOn:'回転停止', rotateOff:'回転開始',
+    btn_reset:'リセット', btn_slowgen:'スロー生成', btn_screenshot:'撮影',
+    btn_mech:'機構を見る', btn_reaction:'反応を見る',
+    view_ball:'ボール 3D', view_wire:'ワイヤーフレーム', view_nucleus:'原子核',
+    view_shell:'電子殻', view_cloud:'電子雲', view_slice:'断面',
+    menu_home:'ホーム', menu_guide:'ガイド', menu_periodic:'周期表',
+    menu_contact:'連絡先',
+    menu_home_desc:'3D原子・分子シミュレーション。',
+    menu_home_back:'→ ホームへ',
+    periodic_hint:'元素をタップして表示',
+    info_name:'名前', info_en:'英語', info_Z:'原子番号 Z',
+    info_N:'中性子 N', info_mass:'質量', info_shells:'電子殻',
+    info_total_e:'総電子',
+    mech_header:'反応機構',
+    mech_play:'再生', mech_pause:'一時停止',
+    mech_prev:'◀ 前へ', mech_next:'次へ ▶',
+    mech_step:'ステップ',
+    mech_no_steps:'この物質の機構データはありません。',
+    guide_1:'化学式、物質名、元素を入力:',
+    guide_2:'複雑な化学式に対応: Ca(OH)2, CH3+CH3',
+    guide_3:'反応（+付き）には「反応を見る」ボタンがあります',
+    guide_4:'データがあれば「機構を見る」ボタンが表示されます',
+    guide_views:'表示モード:',
+    element_names: { H:'水素', O:'酸素', C:'炭素', N:'窒素', Na:'ナトリウム',
+      Cl:'塩素', S:'硫黄', P:'リン', Fe:'鉄', Au:'金', Cu:'銅',
+      Ca:'カルシウム', K:'カリウム', Mg:'マグネシウム', Zn:'亜鉛' }
+  },
+  zh: {
+    label:'中文',
+    placeholder:'输入化学式、物质名或元素...',
+    empty:'输入化学式、物质名或元素开始',
+    notFound:'未找到: ',
+    menu:'菜单',
+    hint:'滚动: 缩放 · 拖动: 旋转 · 点击: 信息',
+    rotateOn:'停止旋转', rotateOff:'开始旋转',
+    btn_reset:'重置', btn_slowgen:'慢速生成', btn_screenshot:'截图',
+    btn_mech:'查看机制', btn_reaction:'查看反应',
+    view_ball:'球模型 3D', view_wire:'线框', view_nucleus:'原子核',
+    view_shell:'电子层', view_cloud:'电子云', view_slice:'截面',
+    menu_home:'主页', menu_guide:'指南', menu_periodic:'元素周期表',
+    menu_contact:'联系',
+    menu_home_desc:'3D原子与分子模拟。',
+    menu_home_back:'→ 返回主页',
+    periodic_hint:'点击元素查看',
+    info_name:'名称', info_en:'英文', info_Z:'原子序数 Z',
+    info_N:'中子 N', info_mass:'质量', info_shells:'电子层',
+    info_total_e:'总电子',
+    mech_header:'反应机制',
+    mech_play:'播放', mech_pause:'暂停',
+    mech_prev:'◀ 上一个', mech_next:'下一个 ▶',
+    mech_step:'步骤',
+    mech_no_steps:'该物质暂无机制数据。',
+    guide_1:'输入化学式、物质名或元素:',
+    guide_2:'支持复杂化学式: Ca(OH)2, CH3+CH3',
+    guide_3:'反应（带+）有"查看反应"按钮',
+    guide_4:'如有数据，物质显示"查看机制"按钮',
+    guide_views:'视图模式:',
+    element_names: { H:'氢', O:'氧', C:'碳', N:'氮', Na:'钠',
+      Cl:'氯', S:'硫', P:'磷', Fe:'铁', Au:'金', Cu:'铜',
+      Ca:'钙', K:'钾', Mg:'镁', Zn:'锌' }
+  },
+  ko: {
+    label:'한국어',
+    placeholder:'화학식, 물질명 또는 원소 입력...',
+    empty:'화학식, 물질명 또는 원소를 입력하세요',
+    notFound:'찾을 수 없음: ',
+    menu:'메뉴',
+    hint:'스크롤: 확대 · 드래그: 회전 · 클릭: 정보',
+    rotateOn:'회전 중지', rotateOff:'회전 시작',
+    btn_reset:'초기화', btn_slowgen:'슬로우 생성', btn_screenshot:'스크린샷',
+    btn_mech:'메커니즘 보기', btn_reaction:'반응 보기',
+    view_ball:'볼 3D', view_wire:'와이어프레임', view_nucleus:'원자핵',
+    view_shell:'전자 껍질', view_cloud:'전자 구름', view_slice:'단면',
+    menu_home:'홈', menu_guide:'가이드', menu_periodic:'주기율표',
+    menu_contact:'연락',
+    menu_home_desc:'3D 원자 및 분자 시뮬레이션.',
+    menu_home_back:'→ 홈으로',
+    periodic_hint:'원소를 탭하여 보기',
+    info_name:'이름', info_en:'영어', info_Z:'원자 번호 Z',
+    info_N:'중성자 N', info_mass:'질량', info_shells:'전자 껍질',
+    info_total_e:'총 전자',
+    mech_header:'반응 메커니즘',
+    mech_play:'재생', mech_pause:'일시정지',
+    mech_prev:'◀ 이전', mech_next:'다음 ▶',
+    mech_step:'단계',
+    mech_no_steps:'이 물질의 메커니즘 데이터가 없습니다.',
+    guide_1:'화학식, 물질명 또는 원소 입력:',
+    guide_2:'복잡한 화학식 지원: Ca(OH)2, CH3+CH3',
+    guide_3:'반응(+ 포함)에는 "반응 보기" 버튼이 있습니다',
+    guide_4:'데이터가 있으면 "메커니즘 보기" 버튼이 표시됩니다',
+    guide_views:'보기 모드:',
+    element_names: { H:'수소', O:'산소', C:'탄소', N:'질소', Na:'나트륨',
+      Cl:'염소', S:'황', P:'인', Fe:'철', Au:'금', Cu:'구리',
+      Ca:'칼슘', K:'칼륨', Mg:'마그네슘', Zn:'아연' }
+  },
+  fr: {
+    label:'Français',
+    placeholder:'Entrez formule, nom ou élément...',
+    empty:'Entrez une formule, un nom ou un élément',
+    notFound:'Non trouvé: ',
+    menu:'Menu',
+    hint:'DÉFILER: ZOOM · GLISSER: TOURNER · CLIC: INFO',
+    rotateOn:'Arrêter', rotateOff:'Tourner',
+    btn_reset:'Réinitialiser', btn_slowgen:'Génération lente', btn_screenshot:'Capture',
+    btn_mech:'Voir mécanisme', btn_reaction:'Voir réaction',
+    view_ball:'Boule 3D', view_wire:'Fil de fer', view_nucleus:'Noyau',
+    view_shell:'Couche e', view_cloud:'Nuage e', view_slice:'Coupe',
+    menu_home:'Accueil', menu_guide:'Guide', menu_periodic:'Tableau périodique',
+    menu_contact:'Contact',
+    menu_home_desc:'Simulation 3D d\'atomes et molécules.',
+    menu_home_back:'→ Retour à l\'accueil',
+    periodic_hint:'Appuyez sur un élément',
+    info_name:'Nom', info_en:'Anglais', info_Z:'Numéro atomique Z',
+    info_N:'Neutrons N', info_mass:'Masse', info_shells:'Couches',
+    info_total_e:'Total e',
+    mech_header:'Mécanisme de réaction',
+    mech_play:'Lecture', mech_pause:'Pause',
+    mech_prev:'◀ Préc', mech_next:'Suiv ▶',
+    mech_step:'Étape',
+    mech_no_steps:'Pas de données de mécanisme.',
+    guide_1:'Entrez formule, nom ou élément:',
+    guide_2:'Formules complexes: Ca(OH)2, CH3+CH3',
+    guide_3:'Les réactions (+) ont un bouton "Voir réaction"',
+    guide_4:'Les substances affichent "Voir mécanisme" si disponible',
+    guide_views:'Modes de vue:',
+    element_names: { H:'Hydrogène', O:'Oxygène', C:'Carbone', N:'Azote',
+      Na:'Sodium', Cl:'Chlore', S:'Soufre', P:'Phosphore', Fe:'Fer',
+      Au:'Or', Cu:'Cuivre', Ca:'Calcium', K:'Potassium', Mg:'Magnésium',
+      Zn:'Zinc' }
+  },
+  es: {
+    label:'Español',
+    placeholder:'Ingresa fórmula, nombre o elemento...',
+    empty:'Ingresa una fórmula, nombre o elemento',
+    notFound:'No encontrado: ',
+    menu:'Menú',
+    hint:'DESPLAZAR: ZOOM · ARRASTRAR: GIRAR · CLIC: INFO',
+    rotateOn:'Detener', rotateOff:'Girar',
+    btn_reset:'Reiniciar', btn_slowgen:'Gen. lenta', btn_screenshot:'Captura',
+    btn_mech:'Ver mecanismo', btn_reaction:'Ver reacción',
+    view_ball:'Esfera 3D', view_wire:'Estructura', view_nucleus:'Núcleo',
+    view_shell:'Capa e', view_cloud:'Nube e', view_slice:'Corte',
+    menu_home:'Inicio', menu_guide:'Guía', menu_periodic:'Tabla periódica',
+    menu_contact:'Contacto',
+    menu_home_desc:'Simulación 3D de átomos y moléculas.',
+    menu_home_back:'→ Volver al inicio',
+    periodic_hint:'Toca un elemento',
+    info_name:'Nombre', info_en:'Inglés', info_Z:'Número atómico Z',
+    info_N:'Neutrones N', info_mass:'Masa', info_shells:'Capas',
+    info_total_e:'Total e',
+    mech_header:'Mecanismo de reacción',
+    mech_play:'Reproducir', mech_pause:'Pausa',
+    mech_prev:'◀ Ant', mech_next:'Sig ▶',
+    mech_step:'Paso',
+    mech_no_steps:'Sin datos de mecanismo.',
+    guide_1:'Ingresa fórmula, nombre o elemento:',
+    guide_2:'Fórmulas complejas: Ca(OH)2, CH3+CH3',
+    guide_3:'Las reacciones (+) tienen "Ver reacción"',
+    guide_4:'Sustancias muestran "Ver mecanismo" si hay datos',
+    guide_views:'Modos de vista:',
+    element_names: { H:'Hidrógeno', O:'Oxígeno', C:'Carbono', N:'Nitrógeno',
+      Na:'Sodio', Cl:'Cloro', S:'Azufre', P:'Fósforo', Fe:'Hierro',
+      Au:'Oro', Cu:'Cobre', Ca:'Calcio', K:'Potasio', Mg:'Magnesio',
+      Zn:'Zinc' }
+  },
+  de: {
+    label:'Deutsch',
+    placeholder:'Formel, Stoffname oder Element eingeben...',
+    empty:'Formel, Stoffname oder Element eingeben',
+    notFound:'Nicht gefunden: ',
+    menu:'Menü',
+    hint:'SCROLLEN: ZOOM · ZIEHEN: DREHEN · KLICK: INFO',
+    rotateOn:'Stoppen', rotateOff:'Drehen',
+    btn_reset:'Zurücksetzen', btn_slowgen:'Langsam', btn_screenshot:'Screenshot',
+    btn_mech:'Mechanismus', btn_reaction:'Reaktion',
+    view_ball:'Kugel 3D', view_wire:'Drahtgitter', view_nucleus:'Kern',
+    view_shell:'Schale e', view_cloud:'Wolke e', view_slice:'Schnitt',
+    menu_home:'Start', menu_guide:'Anleitung', menu_periodic:'Periodensystem',
+    menu_contact:'Kontakt',
+    menu_home_desc:'3D-Atom- und Molekülsimulation.',
+    menu_home_back:'→ Zurück zur Startseite',
+    periodic_hint:'Element antippen',
+    info_name:'Name', info_en:'Englisch', info_Z:'Ordnungszahl Z',
+    info_N:'Neutronen N', info_mass:'Masse', info_shells:'Schalen',
+    info_total_e:'Gesamt e',
+    mech_header:'Reaktionsmechanismus',
+    mech_play:'Abspielen', mech_pause:'Pause',
+    mech_prev:'◀ Zurück', mech_next:'Weiter ▶',
+    mech_step:'Schritt',
+    mech_no_steps:'Keine Mechanismudaten.',
+    guide_1:'Formel, Stoffname oder Element eingeben:',
+    guide_2:'Komplexe Formeln: Ca(OH)2, CH3+CH3',
+    guide_3:'Reaktionen (+) haben "Reaktion"-Button',
+    guide_4:'Substanzen zeigen "Mechanismus" falls verfügbar',
+    guide_views:'Ansichtsmodi:',
+    element_names: { H:'Wasserstoff', O:'Sauerstoff', C:'Kohlenstoff', N:'Stickstoff',
+      Na:'Natrium', Cl:'Chlor', S:'Schwefel', P:'Phosphor', Fe:'Eisen',
+      Au:'Gold', Cu:'Kupfer', Ca:'Calcium', K:'Kalium', Mg:'Magnesium',
+      Zn:'Zink' }
+  },
+  ru: {
+    label:'Русский',
+    placeholder:'Введите формулу, название или элемент...',
+    empty:'Введите формулу, название вещества или элемент',
+    notFound:'Не найдено: ',
+    menu:'Меню',
+    hint:'ПРОКРУТКА: МАСШТАБ · ПЕРЕТАЩИТЬ: ПОВОРОТ',
+    rotateOn:'Стоп', rotateOff:'Вращать',
+    btn_reset:'Сброс', btn_slowgen:'Медленно', btn_screenshot:'Снимок',
+    btn_mech:'Механизм', btn_reaction:'Реакция',
+    view_ball:'Шар 3D', view_wire:'Каркас', view_nucleus:'Ядро',
+    view_shell:'Оболочка e', view_cloud:'Облако e', view_slice:'Сечение',
+    menu_home:'Главная', menu_guide:'Руководство', menu_periodic:'Таблица Менделеева',
+    menu_contact:'Контакт',
+    menu_home_desc:'3D-симуляция атомов и молекул.',
+    menu_home_back:'→ На главную',
+    periodic_hint:'Нажмите на элемент',
+    info_name:'Название', info_en:'Английский', info_Z:'Атомный номер Z',
+    info_N:'Нейтроны N', info_mass:'Масса', info_shells:'Оболочки',
+    info_total_e:'Всего e',
+    mech_header:'Механизм реакции',
+    mech_play:'Играть', mech_pause:'Пауза',
+    mech_prev:'◀ Назад', mech_next:'Далее ▶',
+    mech_step:'Шаг',
+    mech_no_steps:'Нет данных о механизме.',
+    guide_1:'Введите формулу, название или элемент:',
+    guide_2:'Сложные формулы: Ca(OH)2, CH3+CH3',
+    guide_3:'Реакции (+) имеют кнопку "Реакция"',
+    guide_4:'Вещества показывают "Механизм" при наличии данных',
+    guide_views:'Режимы просмотра:',
+    element_names: { H:'Водород', O:'Кислород', C:'Углерод', N:'Азот',
+      Na:'Натрий', Cl:'Хлор', S:'Сера', P:'Фосфор', Fe:'Железо',
+      Au:'Золото', Cu:'Медь', Ca:'Кальций', K:'Калий', Mg:'Магний',
+      Zn:'Цинк' }
+  },
+  pt: {
+    label:'Português',
+    placeholder:'Digite fórmula, nome ou elemento...',
+    empty:'Digite uma fórmula, nome ou elemento',
+    notFound:'Não encontrado: ',
+    menu:'Menu',
+    hint:'ROLAR: ZOOM · ARRASTAR: GIRAR · CLIQUE: INFO',
+    rotateOn:'Parar', rotateOff:'Girar',
+    btn_reset:'Reiniciar', btn_slowgen:'Ger. lenta', btn_screenshot:'Captura',
+    btn_mech:'Ver mecanismo', btn_reaction:'Ver reação',
+    view_ball:'Esfera 3D', view_wire:'Estrutura', view_nucleus:'Núcleo',
+    view_shell:'Camada e', view_cloud:'Nuvem e', view_slice:'Corte',
+    menu_home:'Início', menu_guide:'Guia', menu_periodic:'Tabela periódica',
+    menu_contact:'Contato',
+    menu_home_desc:'Simulação 3D de átomos e moléculas.',
+    menu_home_back:'→ Voltar ao início',
+    periodic_hint:'Toque em um elemento',
+    info_name:'Nome', info_en:'Inglês', info_Z:'Número atômico Z',
+    info_N:'Nêutrons N', info_mass:'Massa', info_shells:'Camadas',
+    info_total_e:'Total e',
+    mech_header:'Mecanismo de reação',
+    mech_play:'Reproduzir', mech_pause:'Pausar',
+    mech_prev:'◀ Ant', mech_next:'Próx ▶',
+    mech_step:'Passo',
+    mech_no_steps:'Sem dados de mecanismo.',
+    guide_1:'Digite fórmula, nome ou elemento:',
+    guide_2:'Fórmulas complexas: Ca(OH)2, CH3+CH3',
+    guide_3:'Reações (+) têm "Ver reação"',
+    guide_4:'Substâncias mostram "Ver mecanismo" se disponível',
+    guide_views:'Modos de visualização:',
+    element_names: { H:'Hidrogênio', O:'Oxigênio', C:'Carbono', N:'Nitrogênio',
+      Na:'Sódio', Cl:'Cloro', S:'Enxofre', P:'Fósforo', Fe:'Ferro',
+      Au:'Ouro', Cu:'Cobre', Ca:'Cálcio', K:'Potássio', Mg:'Magnésio',
+      Zn:'Zinco' }
+  },
+  it: {
+    label:'Italiano',
+    placeholder:'Inserisci formula, nome o elemento...',
+    empty:'Inserisci una formula, un nome o un elemento',
+    notFound:'Non trovato: ',
+    menu:'Menu',
+    hint:'SCORRI: ZOOM · TRASCINA: RUOTA · CLIC: INFO',
+    rotateOn:'Ferma', rotateOff:'Ruota',
+    btn_reset:'Reimposta', btn_slowgen:'Gen. lenta', btn_screenshot:'Cattura',
+    btn_mech:'Vedi meccanismo', btn_reaction:'Vedi reazione',
+    view_ball:'Sfera 3D', view_wire:'Reticolo', view_nucleus:'Nucleo',
+    view_shell:'Guscio e', view_cloud:'Nuvola e', view_slice:'Sezione',
+    menu_home:'Home', menu_guide:'Guida', menu_periodic:'Tavola periodica',
+    menu_contact:'Contatto',
+    menu_home_desc:'Simulazione 3D di atomi e molecole.',
+    menu_home_back:'→ Torna alla home',
+    periodic_hint:'Tocca un elemento',
+    info_name:'Nome', info_en:'Inglese', info_Z:'Numero atomico Z',
+    info_N:'Neutroni N', info_mass:'Massa', info_shells:'Gusci',
+    info_total_e:'Totale e',
+    mech_header:'Meccanismo di reazione',
+    mech_play:'Riproduci', mech_pause:'Pausa',
+    mech_prev:'◀ Prec', mech_next:'Succ ▶',
+    mech_step:'Passo',
+    mech_no_steps:'Nessun dato di meccanismo.',
+    guide_1:'Inserisci formula, nome o elemento:',
+    guide_2:'Formule complesse: Ca(OH)2, CH3+CH3',
+    guide_3:'Le reazioni (+) hanno "Vedi reazione"',
+    guide_4:'Le sostanze mostrano "Vedi meccanismo" se disponibile',
+    guide_views:'Modalità di visualizzazione:',
+    element_names: { H:'Idrogeno', O:'Ossigeno', C:'Carbonio', N:'Azoto',
+      Na:'Sodio', Cl:'Cloro', S:'Zolfo', P:'Fosforo', Fe:'Ferro',
+      Au:'Oro', Cu:'Rame', Ca:'Calcio', K:'Potassio', Mg:'Magnesio',
+      Zn:'Zinco' }
+  },
+  th: {
+    label:'ไทย',
+    placeholder:'ป้อนสูตร ชื่อสาร หรือธาตุ...',
+    empty:'ป้อนสูตร ชื่อสาร หรือธาตุเพื่อเริ่มต้น',
+    notFound:'ไม่พบ: ',
+    menu:'เมนู',
+    hint:'เลื่อน: ซูม · ลาก: หมุน · คลิก: ข้อมูล',
+    rotateOn:'หยุดหมุน', rotateOff:'เริ่มหมุน',
+    btn_reset:'รีเซ็ต', btn_slowgen:'สร้างช้า', btn_screenshot:'ภาพหน้าจอ',
+    btn_mech:'ดูกลไก', btn_reaction:'ดูปฏิกิริยา',
+    view_ball:'ลูกบอล 3D', view_wire:'โครงร่าง', view_nucleus:'นิวเคลียส',
+    view_shell:'ชั้นอิเล็กตรอน', view_cloud:'เมฆอิเล็กตรอน', view_slice:'ตัดขวาง',
+    menu_home:'หน้าแรก', menu_guide:'คู่มือ', menu_periodic:'ตารางธาตุ',
+    menu_contact:'ติดต่อ',
+    menu_home_desc:'การจำลองอะตอมและโมเลกุล 3D',
+    menu_home_back:'→ กลับหน้าแรก',
+    periodic_hint:'แตะธาตุเพื่อดู',
+    info_name:'ชื่อ', info_en:'อังกฤษ', info_Z:'เลขอะตอม Z',
+    info_N:'นิวตรอน N', info_mass:'มวล', info_shells:'ชั้น',
+    info_total_e:'อิเล็กตรอนรวม',
+    mech_header:'กลไกปฏิกิริยา',
+    mech_play:'เล่น', mech_pause:'หยุด',
+    mech_prev:'◀ ก่อน', mech_next:'ต่อไป ▶',
+    mech_step:'ขั้น',
+    mech_no_steps:'ไม่มีข้อมูลกลไก',
+    guide_1:'ป้อนสูตร ชื่อสาร หรือธาตุ:',
+    guide_2:'สูตรซับซ้อน: Ca(OH)2, CH3+CH3',
+    guide_3:'ปฏิกิริยา (มี +) มีปุ่ม "ดูปฏิกิริยา"',
+    guide_4:'สารจะแสดง "ดูกลไก" หากมีข้อมูล',
+    guide_views:'โหมดมุมมอง:',
+    element_names: { H:'ไฮโดรเจน', O:'ออกซิเจน', C:'คาร์บอน', N:'ไนโตรเจน',
+      Na:'โซเดียม', Cl:'คลอรีน', S:'กำมะถัน', P:'ฟอสฟอรัส', Fe:'เหล็ก',
+      Au:'ทอง', Cu:'ทองแดง', Ca:'แคลเซียม', K:'โพแทสเซียม',
+      Mg:'แมกนีเซียม', Zn:'สังกะสี' }
+  }
+};
+
+let currentLang = 'vi';
+function t(key) {
+  const L = LANGS[currentLang] || LANGS.vi;
+  return L[key] !== undefined ? L[key] : (LANGS.vi[key] || key);
+}
+function elName(sym) {
+  const L = LANGS[currentLang] || LANGS.vi;
+  return (L.element_names && L.element_names[sym]) || (ELEMENTS[sym] && ELEMENTS[sym].en) || sym;
+}
+
+/* ============================================================
+   ELEMENTS — 118 nguyên tố
+============================================================ */
+const ELEMENTS = {
+  H:{en:'Hydrogen',color:0xffffff,Z:1,N:0,mass:1.008,shells:[1]},
+  He:{en:'Helium',color:0xd9ffff,Z:2,N:2,mass:4.0026,shells:[2]},
+  Li:{en:'Lithium',color:0xcc80ff,Z:3,N:4,mass:6.94,shells:[2,1]},
+  Be:{en:'Beryllium',color:0xc2ff00,Z:4,N:5,mass:9.0122,shells:[2,2]},
+  B:{en:'Boron',color:0xffb5b5,Z:5,N:6,mass:10.81,shells:[2,3]},
+  C:{en:'Carbon',color:0x555555,Z:6,N:6,mass:12.011,shells:[2,4]},
+  N:{en:'Nitrogen',color:0x3050f8,Z:7,N:7,mass:14.007,shells:[2,5]},
+  O:{en:'Oxygen',color:0xff3333,Z:8,N:8,mass:15.999,shells:[2,6]},
+  F:{en:'Fluorine',color:0x90e050,Z:9,N:10,mass:18.998,shells:[2,7]},
+  Ne:{en:'Neon',color:0xb3e3f5,Z:10,N:10,mass:20.180,shells:[2,8]},
+  Na:{en:'Sodium',color:0xab5cf2,Z:11,N:12,mass:22.990,shells:[2,8,1]},
+  Mg:{en:'Magnesium',color:0x8aff00,Z:12,N:12,mass:24.305,shells:[2,8,2]},
+  Al:{en:'Aluminium',color:0xbfa6a6,Z:13,N:14,mass:26.982,shells:[2,8,3]},
+  Si:{en:'Silicon',color:0xf0c8a0,Z:14,N:14,mass:28.085,shells:[2,8,4]},
+  P:{en:'Phosphorus',color:0xff8000,Z:15,N:16,mass:30.974,shells:[2,8,5]},
+  S:{en:'Sulfur',color:0xffff30,Z:16,N:16,mass:32.06,shells:[2,8,6]},
+  Cl:{en:'Chlorine',color:0x1ff01f,Z:17,N:18,mass:35.45,shells:[2,8,7]},
+  Ar:{en:'Argon',color:0x80d1e3,Z:18,N:22,mass:39.948,shells:[2,8,8]},
+  K:{en:'Potassium',color:0x8f40d4,Z:19,N:20,mass:39.098,shells:[2,8,8,1]},
+  Ca:{en:'Calcium',color:0x3dff00,Z:20,N:20,mass:40.078,shells:[2,8,8,2]},
+  Sc:{en:'Scandium',color:0xe6e6e6,Z:21,N:24,mass:44.956,shells:[2,8,9,2]},
+  Ti:{en:'Titanium',color:0xbfc2c7,Z:22,N:26,mass:47.867,shells:[2,8,10,2]},
+  V:{en:'Vanadium',color:0xa6a6ab,Z:23,N:28,mass:50.942,shells:[2,8,11,2]},
+  Cr:{en:'Chromium',color:0x8a99c7,Z:24,N:28,mass:51.996,shells:[2,8,13,1]},
+  Mn:{en:'Manganese',color:0x9c7ac7,Z:25,N:30,mass:54.938,shells:[2,8,13,2]},
+  Fe:{en:'Iron',color:0xe06633,Z:26,N:30,mass:55.845,shells:[2,8,14,2]},
+  Co:{en:'Cobalt',color:0xf090a0,Z:27,N:32,mass:58.933,shells:[2,8,15,2]},
+  Ni:{en:'Nickel',color:0x50d050,Z:28,N:31,mass:58.693,shells:[2,8,16,2]},
+  Cu:{en:'Copper',color:0xc88033,Z:29,N:35,mass:63.546,shells:[2,8,18,1]},
+  Zn:{en:'Zinc',color:0x7d80b0,Z:30,N:35,mass:65.38,shells:[2,8,18,2]},
+  Ga:{en:'Gallium',color:0xc28f8f,Z:31,N:39,mass:69.723,shells:[2,8,18,3]},
+  Ge:{en:'Germanium',color:0x668f8f,Z:32,N:41,mass:72.630,shells:[2,8,18,4]},
+  As:{en:'Arsenic',color:0xbd80e3,Z:33,N:42,mass:74.922,shells:[2,8,18,5]},
+  Se:{en:'Selenium',color:0xffa100,Z:34,N:45,mass:78.971,shells:[2,8,18,6]},
+  Br:{en:'Bromine',color:0xa62929,Z:35,N:45,mass:79.904,shells:[2,8,18,7]},
+  Kr:{en:'Krypton',color:0x5cb8d1,Z:36,N:48,mass:83.798,shells:[2,8,18,8]},
+  Rb:{en:'Rubidium',color:0x702eb0,Z:37,N:48,mass:85.468,shells:[2,8,18,8,1]},
+  Sr:{en:'Strontium',color:0x00ff00,Z:38,N:50,mass:87.62,shells:[2,8,18,8,2]},
+  Y:{en:'Yttrium',color:0x94ffff,Z:39,N:50,mass:88.906,shells:[2,8,18,9,2]},
+  Zr:{en:'Zirconium',color:0x94e0e0,Z:40,N:51,mass:91.224,shells:[2,8,18,10,2]},
+  Nb:{en:'Niobium',color:0x73c2c9,Z:41,N:52,mass:92.906,shells:[2,8,18,12,1]},
+  Mo:{en:'Molybdenum',color:0x54b5b5,Z:42,N:54,mass:95.95,shells:[2,8,18,13,1]},
+  Tc:{en:'Technetium',color:0x3b9e9e,Z:43,N:55,mass:98,shells:[2,8,18,13,2]},
+  Ru:{en:'Ruthenium',color:0x248f8f,Z:44,N:57,mass:101.07,shells:[2,8,18,15,1]},
+  Rh:{en:'Rhodium',color:0x0a7d8c,Z:45,N:58,mass:102.91,shells:[2,8,18,16,1]},
+  Pd:{en:'Palladium',color:0x006985,Z:46,N:60,mass:106.42,shells:[2,8,18,18]},
+  Ag:{en:'Silver',color:0xc0c0c0,Z:47,N:61,mass:107.87,shells:[2,8,18,18,1]},
+  Cd:{en:'Cadmium',color:0xffd98f,Z:48,N:64,mass:112.41,shells:[2,8,18,18,2]},
+  In:{en:'Indium',color:0xa67573,Z:49,N:66,mass:114.82,shells:[2,8,18,18,3]},
+  Sn:{en:'Tin',color:0x668080,Z:50,N:69,mass:118.71,shells:[2,8,18,18,4]},
+  Sb:{en:'Antimony',color:0x9e63b5,Z:51,N:71,mass:121.76,shells:[2,8,18,18,5]},
+  Te:{en:'Tellurium',color:0xd47a00,Z:52,N:76,mass:127.60,shells:[2,8,18,18,6]},
+  I:{en:'Iodine',color:0x940094,Z:53,N:74,mass:126.90,shells:[2,8,18,18,7]},
+  Xe:{en:'Xenon',color:0x429eb0,Z:54,N:77,mass:131.29,shells:[2,8,18,18,8]},
+  Cs:{en:'Caesium',color:0x57178f,Z:55,N:78,mass:132.91,shells:[2,8,18,18,8,1]},
+  Ba:{en:'Barium',color:0x00c900,Z:56,N:81,mass:137.33,shells:[2,8,18,18,8,2]},
+  La:{en:'Lanthanum',color:0x70d4ff,Z:57,N:82,mass:138.91,shells:[2,8,18,18,9,2]},
+  Ce:{en:'Cerium',color:0xffffc7,Z:58,N:82,mass:140.12,shells:[2,8,18,19,9,2]},
+  Pr:{en:'Praseodymium',color:0xd9ffc7,Z:59,N:82,mass:140.91,shells:[2,8,18,21,8,2]},
+  Nd:{en:'Neodymium',color:0xc7ffc7,Z:60,N:84,mass:144.24,shells:[2,8,18,22,8,2]},
+  Pm:{en:'Promethium',color:0xa3ffc7,Z:61,N:84,mass:145,shells:[2,8,18,23,8,2]},
+  Sm:{en:'Samarium',color:0x8fffc7,Z:62,N:88,mass:150.36,shells:[2,8,18,24,8,2]},
+  Eu:{en:'Europium',color:0x61ffc7,Z:63,N:89,mass:151.96,shells:[2,8,18,25,8,2]},
+  Gd:{en:'Gadolinium',color:0x45ffc7,Z:64,N:93,mass:157.25,shells:[2,8,18,25,9,2]},
+  Tb:{en:'Terbium',color:0x30ffc7,Z:65,N:94,mass:158.93,shells:[2,8,18,27,8,2]},
+  Dy:{en:'Dysprosium',color:0x1fffc7,Z:66,N:97,mass:162.50,shells:[2,8,18,28,8,2]},
+  Ho:{en:'Holmium',color:0x00ff9c,Z:67,N:98,mass:164.93,shells:[2,8,18,29,8,2]},
+  Er:{en:'Erbium',color:0x00e675,Z:68,N:99,mass:167.26,shells:[2,8,18,30,8,2]},
+  Tm:{en:'Thulium',color:0x00d452,Z:69,N:100,mass:168.93,shells:[2,8,18,31,8,2]},
+  Yb:{en:'Ytterbium',color:0x00bf38,Z:70,N:103,mass:173.05,shells:[2,8,18,32,8,2]},
+  Lu:{en:'Lutetium',color:0x00ab24,Z:71,N:104,mass:174.97,shells:[2,8,18,32,9,2]},
+  Hf:{en:'Hafnium',color:0x4dc2ff,Z:72,N:106,mass:178.49,shells:[2,8,18,32,10,2]},
+  Ta:{en:'Tantalum',color:0x4da6ff,Z:73,N:108,mass:180.95,shells:[2,8,18,32,11,2]},
+  W:{en:'Tungsten',color:0x2194d6,Z:74,N:110,mass:183.84,shells:[2,8,18,32,12,2]},
+  Re:{en:'Rhenium',color:0x267dab,Z:75,N:111,mass:186.21,shells:[2,8,18,32,13,2]},
+  Os:{en:'Osmium',color:0x266696,Z:76,N:114,mass:190.23,shells:[2,8,18,32,14,2]},
+  Ir:{en:'Iridium',color:0x175487,Z:77,N:115,mass:192.22,shells:[2,8,18,32,15,2]},
+  Pt:{en:'Platinum',color:0xd0d0e0,Z:78,N:117,mass:195.08,shells:[2,8,18,32,17,1]},
+  Au:{en:'Gold',color:0xffd123,Z:79,N:118,mass:196.97,shells:[2,8,18,32,18,1]},
+  Hg:{en:'Mercury',color:0xb8b8d0,Z:80,N:121,mass:200.59,shells:[2,8,18,32,18,2]},
+  Tl:{en:'Thallium',color:0xa6544d,Z:81,N:123,mass:204.38,shells:[2,8,18,32,18,3]},
+  Pb:{en:'Lead',color:0x575961,Z:82,N:125,mass:207.2,shells:[2,8,18,32,18,4]},
+  Bi:{en:'Bismuth',color:0x9e4fb5,Z:83,N:126,mass:208.98,shells:[2,8,18,32,18,5]},
+  Po:{en:'Polonium',color:0xab5c00,Z:84,N:125,mass:209,shells:[2,8,18,32,18,6]},
+  At:{en:'Astatine',color:0x754f45,Z:85,N:125,mass:210,shells:[2,8,18,32,18,7]},
+  Rn:{en:'Radon',color:0x428296,Z:86,N:136,mass:222,shells:[2,8,18,32,18,8]},
+  Fr:{en:'Francium',color:0x420066,Z:87,N:136,mass:223,shells:[2,8,18,32,18,8,1]},
+  Ra:{en:'Radium',color:0x007d00,Z:88,N:138,mass:226,shells:[2,8,18,32,18,8,2]},
+  Ac:{en:'Actinium',color:0x70abfa,Z:89,N:138,mass:227,shells:[2,8,18,32,18,9,2]},
+  Th:{en:'Thorium',color:0x00baff,Z:90,N:142,mass:232.04,shells:[2,8,18,32,18,10,2]},
+  Pa:{en:'Protactinium',color:0x00a1ff,Z:91,N:140,mass:231.04,shells:[2,8,18,32,20,9,2]},
+  U:{en:'Uranium',color:0x008fff,Z:92,N:146,mass:238.03,shells:[2,8,18,32,21,9,2]},
+  Np:{en:'Neptunium',color:0x0080ff,Z:93,N:144,mass:237,shells:[2,8,18,32,22,9,2]},
+  Pu:{en:'Plutonium',color:0x006bff,Z:94,N:150,mass:244,shells:[2,8,18,32,24,8,2]},
+  Am:{en:'Americium',color:0x545cf2,Z:95,N:148,mass:243,shells:[2,8,18,32,25,8,2]},
+  Cm:{en:'Curium',color:0x785ce3,Z:96,N:151,mass:247,shells:[2,8,18,32,25,9,2]},
+  Bk:{en:'Berkelium',color:0x8a4fe3,Z:97,N:150,mass:247,shells:[2,8,18,32,27,8,2]},
+  Cf:{en:'Californium',color:0xa136d4,Z:98,N:153,mass:251,shells:[2,8,18,32,28,8,2]},
+  Es:{en:'Einsteinium',color:0xb31fd4,Z:99,N:153,mass:252,shells:[2,8,18,32,28,9,2]},
+  Fm:{en:'Fermium',color:0xb31fba,Z:100,N:157,mass:257,shells:[2,8,18,32,30,8,2]},
+  Md:{en:'Mendelevium',color:0xb30da6,Z:101,N:157,mass:258,shells:[2,8,18,32,31,8,2]},
+  No:{en:'Nobelium',color:0xbd0d87,Z:102,N:157,mass:259,shells:[2,8,18,32,32,8,2]},
+  Lr:{en:'Lawrencium',color:0xc70066,Z:103,N:159,mass:266,shells:[2,8,18,32,32,8,3]},
+  Rf:{en:'Rutherfordium',color:0xcc0059,Z:104,N:163,mass:267,shells:[2,8,18,32,32,10,2]},
+  Db:{en:'Dubnium',color:0xd1004f,Z:105,N:163,mass:268,shells:[2,8,18,32,32,11,2]},
+  Sg:{en:'Seaborgium',color:0xd90045,Z:106,N:163,mass:269,shells:[2,8,18,32,32,12,2]},
+  Bh:{en:'Bohrium',color:0xe00038,Z:107,N:163,mass:270,shells:[2,8,18,32,32,13,2]},
+  Hs:{en:'Hassium',color:0xe6002e,Z:108,N:163,mass:269,shells:[2,8,18,32,32,14,2]},
+  Mt:{en:'Meitnerium',color:0xeb0026,Z:109,N:169,mass:278,shells:[2,8,18,32,32,15,2]},
+  Ds:{en:'Darmstadtium',color:0xeb0026,Z:110,N:171,mass:281,shells:[2,8,18,32,32,16,2]},
+  Rg:{en:'Roentgenium',color:0xeb0026,Z:111,N:171,mass:282,shells:[2,8,18,32,32,17,2]},
+  Cn:{en:'Copernicium',color:0xeb0026,Z:112,N:173,mass:285,shells:[2,8,18,32,32,18,2]},
+  Nh:{en:'Nihonium',color:0xeb0026,Z:113,N:173,mass:286,shells:[2,8,18,32,32,18,3]},
+  Fl:{en:'Flerovium',color:0xeb0026,Z:114,N:175,mass:289,shells:[2,8,18,32,32,18,4]},
+  Mc:{en:'Moscovium',color:0xeb0026,Z:115,N:175,mass:290,shells:[2,8,18,32,32,18,5]},
+  Lv:{en:'Livermorium',color:0xeb0026,Z:116,N:177,mass:293,shells:[2,8,18,32,32,18,6]},
+  Ts:{en:'Tennessine',color:0xeb0026,Z:117,N:177,mass:294,shells:[2,8,18,32,32,18,7]},
+  Og:{en:'Oganesson',color:0xeb0026,Z:118,N:176,mass:294,shells:[2,8,18,32,32,18,8]}
+};
+
+function atomRadius(sym) {
+  const el = ELEMENTS[sym]; if (!el) return 0.5;
+  return Math.max(0.32, Math.min(1.05, 0.28 + Math.pow(el.Z, 0.32) * 0.075));
+}
+
+/* ============================================================
+   SUBSTANCES
+============================================================ */
+const SUBSTANCES = {
+  'h2o':'H2O','nuoc':'H2O','water':'H2O','eau':'H2O','wasser':'H2O',
+  'agua':'H2O','acqua':'H2O','вода':'H2O','水':'H2O','물':'H2O','น้ำ':'H2O','nước':'H2O',
+  'ch4':'CH4','metan':'CH4','methane':'CH4','méthane':'CH4','methan':'CH4',
+  'metano':'CH4','метан':'CH4','甲烷':'CH4','メタン':'CH4','메탄':'CH4','มีเทน':'CH4',
+  'co2':'CO2','carbon dioxide':'CO2','khí cacbonic':'CO2','cacbonic':'CO2',
+  '二氧化碳':'CO2','二酸化炭素':'CO2','이산화탄소':'CO2',
+  'nh3':'NH3','amoniac':'NH3','ammonia':'NH3','аммиак':'NH3','氨':'NH3','アンモニア':'NH3','암모니아':'NH3',
+  'nacl':'NaCl','muoi an':'NaCl','muối ăn':'NaCl','muối':'NaCl','salt':'NaCl',
+  'table salt':'NaCl','sel':'NaCl','salz':'NaCl','sal':'NaCl','塩':'NaCl','소금':'NaCl',
+  'c6h6':'C6H6','benzen':'C6H6','benzene':'C6H6','бензол':'C6H6','苯':'C6H6',
+  'h2so4':'H2SO4','axit sunfuric':'H2SO4','sulfuric acid':'H2SO4',
+  'hcl':'HCl','axit clohidric':'HCl','hydrochloric acid':'HCl',
+  'hno3':'HNO3','axit nitric':'HNO3','nitric acid':'HNO3',
+  'ch3cooh':'CH3COOH','axit axetic':'CH3COOH','acetic acid':'CH3COOH','giấm':'CH3COOH',
+  'naoh':'NaOH','xut':'NaOH','sodium hydroxide':'NaOH','natri hidroxit':'NaOH',
+  'koh':'KOH','kali hidroxit':'KOH',
+  'ca(oh)2':'Ca(OH)2','voi toi':'Ca(OH)2','vôi tôi':'Ca(OH)2','canxi hidroxit':'Ca(OH)2',
+  'caco3':'CaCO3','đá vôi':'CaCO3','da voi':'CaCO3','canxi cacbonat':'CaCO3','calcium carbonate':'CaCO3',
+  'na2co3':'Na2CO3','sođa':'Na2CO3','soda':'Na2CO3',
+  'nahco3':'NaHCO3','baking soda':'NaHCO3','muối nở':'NaHCO3',
+  'cuso4':'CuSO4','đồng sunfat':'CuSO4','copper sulfate':'CuSO4',
+  'feso4':'FeSO4','sắt sunfat':'FeSO4',
+  'fe2o3':'Fe2O3','oxit sắt':'Fe2O3','gỉ sắt':'Fe2O3','gi sat':'Fe2O3',
+  'hematit':'Fe2O3','hematite':'Fe2O3','sắt(iii) oxit':'Fe2O3',
+  'fe3o4':'Fe3O4','oxit sắt từ':'Fe3O4','magnetit':'Fe3O4','magnetite':'Fe3O4',
+  'feo':'FeO','sắt(ii) oxit':'FeO','iron(ii) oxide':'FeO',
+  'cuo':'CuO','đồng(ii) oxit':'CuO',
+  'zno':'ZnO','kẽm oxit':'ZnO',
+  'al2o3':'Al2O3','nhôm oxit':'Al2O3','aluminium oxide':'Al2O3','alumina':'Al2O3',
+  'sio2':'SiO2','silica':'SiO2','thạch anh':'SiO2',
+  'mgo':'MgO','magie oxit':'MgO',
+  'kmno4':'KMnO4','thuốc tím':'KMnO4',
+  'k2cr2o7':'K2Cr2O7','kali dicromat':'K2Cr2O7',
+  'c6h12o6':'C6H12O6','glucozo':'C6H12O6','glucose':'C6H12O6','đường':'C6H12O6',
+  'c12h22o11':'C12H22O11','saccarozo':'C12H22O11','sucrose':'C12H22O11','đường mía':'C12H22O11',
+  'o2':'O2','oxy':'O2','oxygen':'O2','khí oxy':'O2','кислород':'O2','酸素':'O2','산소':'O2',
+  'h2':'H2','hydro':'H2','hydrogen':'H2','khí hydro':'H2','водород':'H2','水素':'H2','수소':'H2',
+  'n2':'N2','nito':'N2','nitrogen':'N2',
+  'cl2':'Cl2','clo':'Cl2','chlorine':'Cl2',
+  'f2':'F2','flo':'F2','fluorine':'F2',
+  'br2':'Br2','brom':'Br2',
+  'i2':'I2','iot':'I2',
+  'c2h5oh':'C2H5OH','etanol':'C2H5OH','ethanol':'C2H5OH','rượu etylic':'C2H5OH','cồn':'C2H5OH',
+  'ch3oh':'CH3OH','metanol':'CH3OH',
+  'au':'Au','vang':'Au','vàng':'Au','gold':'Au','oro':'Au','or':'Au','金':'Au','금':'Au',
+  'ag':'Ag','bac':'Ag','bạc':'Ag','silver':'Ag','argent':'Ag',
+  'cu':'Cu','dong':'Cu','đồng':'Cu','copper':'Cu',
+  'fe':'Fe','sat':'Fe','sắt':'Fe','iron':'Fe','hierro':'Fe','eisen':'Fe','железо':'Fe','铁':'Fe','철':'Fe',
+  'al':'Al','nhom':'Al','nhôm':'Al','aluminium':'Al',
+  'zn':'Zn','kem':'Zn','kẽm':'Zn','zinc':'Zn',
+  'pb':'Pb','chi':'Pb','chì':'Pb','lead':'Pb',
+  'sn':'Sn','thiec':'Sn','thiếc':'Sn','tin':'Sn',
+  'hg':'Hg','thuy ngan':'Hg','thủy ngân':'Hg','mercury':'Hg',
+  'na':'Na','natri':'Na','sodium':'Na',
+  'k':'K','kali':'K','potassium':'K',
+  'ca':'Ca','canxi':'Ca','calcium':'Ca',
+  'mg':'Mg','magie':'Mg','magnesium':'Mg',
+  'ba':'Ba','bari':'Ba',
+  'o3':'O3','ozon':'O3',
+  'h2o2':'H2O2','hydrogen peroxide':'H2O2','oxy già':'H2O2'
+};
+
+function normalize(str) {
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').trim();
+}
+
+/* ============================================================
+   REACTION / MECHANISM DATA
+============================================================ */
+const MECHANISMS = {
+  'CH4+O2': {
+    title:{ vi:'Phản ứng cháy của metan', en:'Combustion of methane',
+            ja:'メタンの燃焼', zh:'甲烷燃烧', ko:'메탄 연소',
+            fr:'Combustion du méthane', es:'Combustión del metano',
+            de:'Verbrennung von Methan', ru:'Горение метана',
+            pt:'Combustão do metano', it:'Combustione del metano', th:'การเผาไหม้มีเทน' },
+    equation:'CH4 + 2O2 → CO2 + 2H2O',
+    steps:[
+      { title:{vi:'Chuẩn bị chất phản ứng',en:'Reactants prepared',ja:'反応物の準備',zh:'准备反应物',ko:'반응물 준비',fr:'Réactifs préparés',es:'Reactivos preparados',de:'Edukte vorbereitet',ru:'Реагенты подготовлены',pt:'Reagentes preparados',it:'Reagenti preparati',th:'เตรียมสารตั้งต้น'},
+        desc:{vi:'Metan (CH4) và oxy (O2) được đưa lại gần nhau.',en:'Methane (CH4) and oxygen (O2) brought close together.',ja:'メタン（CH4）と酸素（O2）を近づけます。',zh:'甲烷（CH4）和氧气（O2）靠近。',ko:'메탄(CH4)과 산소(O2)를 가까이 둡니다.',fr:'Le méthane (CH4) et l\'oxygène (O2) sont rapprochés.',es:'El metano (CH4) y el oxígeno (O2) se acercan.',de:'Methan (CH4) und Sauerstoff (O2) werden zusammengebracht.',ru:'Метан (CH4) и кислород (O2) сближаются.',pt:'Metano (CH4) e oxigênio (O2) são aproximados.',it:'Metano (CH4) e ossigeno (O2) avvicinati.',th:'มีเทน (CH4) และออกซิเจน (O2) ถูกนำมาใกล้กัน'} },
+      { title:{vi:'Kích hoạt năng lượng',en:'Activation energy',ja:'活性化エネルギー',zh:'活化能',ko:'활성화 에너지',fr:'Énergie d\'activation',es:'Energía de activación',de:'Aktivierungsenergie',ru:'Энергия активации',pt:'Energia de ativação',it:'Energia di attivazione',th:'พลังงานกระตุ้น'},
+        desc:{vi:'Cần nhiệt độ cao (tia lửa) để phá vỡ liên kết C–H và O=O.',en:'High temperature (spark) breaks C–H and O=O bonds.',ja:'高温（火花）でC–HとO=O結合を切断します。',zh:'高温（火花）断裂C–H和O=O键。',ko:'고온(불꽃)이 C–H 및 O=O 결합을 끊습니다.',fr:'Haute température (étincelle) casse les liaisons C–H et O=O.',es:'Alta temperatura (chispa) rompe enlaces C–H y O=O.',de:'Hohe Temperatur (Funke) bricht C–H- und O=O-Bindungen.',ru:'Высокая температура (искра) разрывает связи C–H и O=O.',pt:'Alta temperatura (faísca) quebra ligações C–H e O=O.',it:'Alta temperatura (scintilla) rompe i legami C–H e O=O.',th:'อุณหภูมิสูง (ประกายไฟ) ทำให้พันธะ C–H และ O=O แตก'} },
+      { title:{vi:'Va chạm hiệu quả',en:'Effective collision',ja:'有効衝突',zh:'有效碰撞',ko:'유효 충돌',fr:'Collision efficace',es:'Colisión efectiva',de:'Wirksamer Zusammenstoß',ru:'Эффективное столкновение',pt:'Colisão efetiva',it:'Collisione efficace',th:'การชนที่มีประสิทธิภาพ'},
+        desc:{vi:'Nguyên tử C tách khỏi H, kết hợp với O tạo CO2 và H2O.',en:'C atoms detach from H, combine with O to form CO2 and H2O.',ja:'C原子がHから離れ、Oと結合してCO2とH2Oを形成。',zh:'C原子从H上脱离，与O结合形成CO2和H2O。',ko:'C 원자가 H에서 떨어져 O와 결합하여 CO2와 H2O 생성.',fr:'Les atomes C se détachent de H et se combinent à O pour former CO2 et H2O.',es:'Los átomos C se separan de H, se combinan con O formando CO2 y H2O.',de:'C-Atome lösen sich von H und verbinden sich mit O zu CO2 und H2O.',ru:'Атомы C отделяются от H и соединяются с O, образуя CO2 и H2O.',pt:'Átomos C se separam de H, combinam com O formando CO2 e H2O.',it:'Gli atomi C si staccano da H, si combinano con O formando CO2 e H2O.',th:'อะตอม C แยกจาก H รวมกับ O เกิด CO2 และ H2O'} },
+      { title:{vi:'Tạo sản phẩm',en:'Products formed',ja:'生成物',zh:'生成产物',ko:'생성물 형성',fr:'Produits formés',es:'Productos formados',de:'Produkte gebildet',ru:'Продукты образованы',pt:'Produtos formados',it:'Prodotti formati',th:'เกิดผลิตภัณฑ์'},
+        desc:{vi:'CO2 (khí) và H2O (hơi) được giải phóng, tỏa nhiệt mạnh.',en:'CO2 (gas) and H2O (vapor) released, strong exothermic.',ja:'CO2（気体）とH2O（蒸気）が放出され、強い発熱。',zh:'释放CO2（气）和H2O（汽），强烈放热。',ko:'CO2(기체)와 H2O(증기) 방출, 강한 발열.',fr:'CO2 (gaz) et H2O (vapeur) libérés, forte exothermique.',es:'CO2 (gas) y H2O (vapor) liberados, fuertemente exotérmico.',de:'CO2 (Gas) und H2O (Dampf) freigesetzt, stark exotherm.',ru:'Выделяются CO2 (газ) и H2O (пар), сильное тепловыделение.',pt:'CO2 (gás) e H2O (vapor) liberados, fortemente exotérmico.',it:'CO2 (gas) e H2O (vapore) rilasciati, fortemente esotermico.',th:'ปล่อย CO2 (แก๊ส) และ H2O (ไอ) คายความร้อนสูง'} }
+    ]
+  },
+  'Fe+O2': {
+    title:{ vi:'Sự gỉ sắt (oxi hóa chậm)', en:'Rusting of iron (slow oxidation)',
+            ja:'鉄の錆（遅い酸化）', zh:'铁生锈', ko:'철의 녹',
+            fr:'Rouille du fer', es:'Oxidación del hierro',
+            de:'Rosten von Eisen', ru:'Ржавление железа',
+            pt:'Ferrugem do ferro', it:'Ruggine del ferro', th:'การเกิดสนิมเหล็ก' },
+    equation:'4Fe + 3O2 → 2Fe2O3',
+    steps:[
+      { title:{vi:'Tiếp xúc với không khí ẩm',en:'Contact with moist air',ja:'湿った空気との接触',zh:'接触潮湿空气',ko:'습한 공기 접촉',fr:'Contact avec l\'air humide',es:'Contacto con aire húmedo',de:'Kontakt mit feuchter Luft',ru:'Контакт с влажным воздухом',pt:'Contato com ar úmido',it:'Contatto con aria umida',th:'สัมผัสอากาศชื้น'},
+        desc:{vi:'Bề mặt sắt tiếp xúc với O2 và hơi nước trong không khí.',en:'Iron surface contacts O2 and water vapor in air.',ja:'鉄表面が空気中のO2と水蒸気に触れます。',zh:'铁表面接触空气中的O2和水蒸气。',ko:'철 표면이 공기 중 O2와 수증기에 접촉.',fr:'La surface du fer est en contact avec O2 et vapeur d\'eau.',es:'La superficie del hierro contacta O2 y vapor de agua.',de:'Eisenoberfläche kommt mit O2 und Wasserdampf in Kontakt.',ru:'Поверхность железа контактирует с O2 и водяным паром.',pt:'Superfície de ferro contata O2 e vapor de água.',it:'La superficie del ferro contatta O2 e vapore acqueo.',th:'ผิวเหล็กสัมผัส O2 และไอน้ำในอากาศ'} },
+      { title:{vi:'Oxi hóa Fe thành Fe²⁺',en:'Fe oxidized to Fe²⁺',ja:'FeがFe²⁺に酸化',zh:'Fe氧化为Fe²⁺',ko:'Fe가 Fe²⁺로 산화',fr:'Fe oxydé en Fe²⁺',es:'Fe oxidado a Fe²⁺',de:'Fe zu Fe²⁺ oxidiert',ru:'Fe окисляется до Fe²⁺',pt:'Fe oxidado a Fe²⁺',it:'Fe ossidato a Fe²⁺',th:'Fe ถูกออกซิไดซ์เป็น Fe²⁺'},
+        desc:{vi:'Fe mất electron → Fe²⁺, tan vào lớp nước mỏng.',en:'Fe loses electrons → Fe²⁺, dissolves in thin water layer.',ja:'Feが電子を失いFe²⁺となり、薄い水層に溶けます。',zh:'Fe失电子→Fe²⁺，溶于薄水层。',ko:'Fe가 전자를 잃고 Fe²⁺로 되어 얇은 물층에 용해.',fr:'Fe perd des électrons → Fe²⁺, dissous dans la fine couche d\'eau.',es:'Fe pierde electrones → Fe²⁺, disuelto en capa fina de agua.',de:'Fe verliert Elektronen → Fe²⁺, löst sich in dünner Wasserschicht.',ru:'Fe теряет электроны → Fe²⁺, растворяется в тонкой плёнке воды.',pt:'Fe perde elétrons → Fe²⁺, dissolve em fina camada de água.',it:'Fe perde elettroni → Fe²⁺, disciolto in sottile strato d\'acqua.',th:'Fe สูญเสียอิเล็กตรอน → Fe²⁺ ละลายในชั้นน้ำบาง'} },
+      { title:{vi:'Tạo gỉ sắt Fe2O3·nH2O',en:'Rust Fe2O3·nH2O formed',ja:'錆Fe2O3·nH2Oの生成',zh:'形成铁锈Fe2O3·nH2O',ko:'녹 Fe2O3·nH2O 생성',fr:'Rouille Fe2O3·nH2O formée',es:'Óxido Fe2O3·nH2O formado',de:'Rost Fe2O3·nH2O gebildet',ru:'Образуется ржавчина Fe2O3·nH2O',pt:'Ferrugem Fe2O3·nH2O formada',it:'Ruggine Fe2O3·nH2O formata',th:'เกิดสนิม Fe2O3·nH2O'},
+        desc:{vi:'Fe²⁺ tiếp tục bị oxi hóa thành Fe³⁺, tạo Fe2O3 ngậm nước — lớp gỉ nâu đỏ.',en:'Fe²⁺ further oxidized to Fe³⁺, forms hydrated Fe2O3 — red-brown rust.',ja:'Fe²⁺がさらにFe³⁺に酸化され、水和Fe2O3（赤褐色の錆）を形成。',zh:'Fe²⁺进一步氧化为Fe³⁺，形成水合Fe2O3——红棕色铁锈。',ko:'Fe²⁺가 더 산화되어 Fe³⁺가 되고 수화 Fe2O3(적갈색 녹) 생성.',fr:'Fe²⁺ encore oxydé en Fe³⁺, forme Fe2O3 hydraté — rouille brun-rouge.',es:'Fe²⁺ más oxidado a Fe³⁺, forma Fe2O3 hidratado — óxido rojo-marrón.',de:'Fe²⁺ weiter zu Fe³⁺ oxidiert, bildet hydratisiertes Fe2O3 — rotbrauner Rost.',ru:'Fe²⁺ далее окисляется до Fe³⁺, образует гидратированный Fe2O3 — красно-коричневую ржавчину.',pt:'Fe²⁺ mais oxidado a Fe³⁺, forma Fe2O3 hidratado — ferrugem vermelho-acastanhada.',it:'Fe²⁺ ulteriormente ossidato a Fe³⁺, forma Fe2O3 idratato — ruggine rosso-marrone.',th:'Fe²⁺ ถูกออกซิไดซ์ต่อเป็น Fe³⁺ เกิด Fe2O3 ไฮเดรต — สนิมสีน้ำตาลแดง'} }
+    ]
+  },
+  'HCl+NaOH': {
+    title:{ vi:'Phản ứng trung hòa', en:'Neutralization reaction',
+            ja:'中和反応', zh:'中和反应', ko:'중화 반응',
+            fr:'Réaction de neutralisation', es:'Reacción de neutralización',
+            de:'Neutralisationsreaktion', ru:'Реакция нейтрализации',
+            pt:'Reação de neutralização', it:'Reazione di neutralizzazione', th:'ปฏิกิริยาสะเทิน' },
+    equation:'HCl + NaOH → NaCl + H2O',
+    steps:[
+      { title:{vi:'Phân ly trong nước',en:'Dissociation in water',ja:'水中での電離',zh:'水中电离',ko:'물에서 해리',fr:'Dissociation dans l\'eau',es:'Disociación en agua',de:'Dissoziation in Wasser',ru:'Диссоциация в воде',pt:'Dissociação em água',it:'Dissociazione in acqua',th:'การแยกตัวในน้ำ'},
+        desc:{vi:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',en:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',ja:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',zh:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',ko:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',fr:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',es:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',de:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',ru:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',pt:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',it:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻',th:'HCl → H⁺ + Cl⁻; NaOH → Na⁺ + OH⁻'} },
+      { title:{vi:'Kết hợp H⁺ và OH⁻',en:'H⁺ and OH⁻ combine',ja:'H⁺とOH⁻の結合',zh:'H⁺与OH⁻结合',ko:'H⁺와 OH⁻ 결합',fr:'H⁺ et OH⁻ se combinent',es:'H⁺ y OH⁻ se combinan',de:'H⁺ und OH⁻ kombinieren',ru:'H⁺ и OH⁻ соединяются',pt:'H⁺ e OH⁻ se combinam',it:'H⁺ e OH⁻ si combinano',th:'H⁺ และ OH⁻ รวมกัน'},
+        desc:{vi:'H⁺ + OH⁻ → H2O. Đây là phản ứng tỏa nhiệt.',en:'H⁺ + OH⁻ → H2O. Exothermic reaction.',ja:'H⁺ + OH⁻ → H2O。発熱反応。',zh:'H⁺ + OH⁻ → H2O。放热反应。',ko:'H⁺ + OH⁻ → H2O. 발열 반응.',fr:'H⁺ + OH⁻ → H2O. Réaction exothermique.',es:'H⁺ + OH⁻ → H2O. Reacción exotérmica.',de:'H⁺ + OH⁻ → H2O. Exotherme Reaktion.',ru:'H⁺ + OH⁻ → H2O. Экзотермическая реакция.',pt:'H⁺ + OH⁻ → H2O. Reação exotérmica.',it:'H⁺ + OH⁻ → H2O. Reazione esotermica.',th:'H⁺ + OH⁻ → H2O ปฏิกิริยาคายความร้อน'} },
+      { title:{vi:'Tạo muối NaCl',en:'NaCl salt formed',ja:'NaCl塩の生成',zh:'形成NaCl盐',ko:'NaCl 염 생성',fr:'Sel NaCl formé',es:'Sal NaCl formada',de:'NaCl-Salz gebildet',ru:'Образуется соль NaCl',pt:'Sal NaCl formado',it:'Sale NaCl formato',th:'เกิดเกลือ NaCl'},
+        desc:{vi:'Na⁺ + Cl⁻ → NaCl kết tinh khi bay hơi nước.',en:'Na⁺ + Cl⁻ → NaCl crystallizes when water evaporates.',ja:'Na⁺ + Cl⁻ → NaCl、水が蒸発すると結晶化。',zh:'Na⁺ + Cl⁻ → NaCl，水蒸发时结晶。',ko:'Na⁺ + Cl⁻ → NaCl, 물이 증발하면 결정화.',fr:'Na⁺ + Cl⁻ → NaCl cristallise quand l\'eau s\'évapore.',es:'Na⁺ + Cl⁻ → NaCl cristaliza al evaporarse el agua.',de:'Na⁺ + Cl⁻ → NaCl kristallisiert beim Verdampfen.',ru:'Na⁺ + Cl⁻ → NaCl кристаллизуется при испарении.',pt:'Na⁺ + Cl⁻ → NaCl cristaliza ao evaporar a água.',it:'Na⁺ + Cl⁻ → NaCl cristallizza evaporando l\'acqua.',th:'Na⁺ + Cl⁻ → NaCl ตกผลึกเมื่อน้ำระเหย'} }
+    ]
+  }
+};
+
+// Cơ chế cho chất đơn (hình thành từ đơn chất)
+const FORMATION = {
+  'Fe2O3': {
+    title:{ vi:'Quá trình hình thành gỉ sắt', en:'Formation of rust',
+            ja:'錆の形成', zh:'铁锈形成', ko:'녹 형성',
+            fr:'Formation de la rouille', es:'Formación de óxido',
+            de:'Bildung von Rost', ru:'Образование ржавчины',
+            pt:'Formação de ferrugem', it:'Formazione di ruggine', th:'การเกิดสนิม' },
+    equation:'4Fe + 3O2 → 2Fe2O3',
+    steps:[
+      { title:{vi:'Sắt nguyên chất',en:'Pure iron',ja:'純鉄',zh:'纯铁',ko:'순철',fr:'Fer pur',es:'Hierro puro',de:'Reines Eisen',ru:'Чистое железо',pt:'Ferro puro',it:'Ferro puro',th:'เหล็กบริสุทธิ์'},
+        desc:{vi:'Fe ở dạng kim loại, nguyên tử sắp xếp chặt khít.',en:'Fe in metallic form, atoms closely packed.',ja:'Fe金属形態、原子は密に配列。',zh:'Fe以金属形式，原子紧密排列。',ko:'Fe 금속 형태, 원자가 촘촘히 배열.',fr:'Fe sous forme métallique, atomes serrés.',es:'Fe en forma metálica, átomos empaquetados.',de:'Fe in metallischer Form, Atome dicht gepackt.',ru:'Fe в металлической форме, атомы плотно упакованы.',pt:'Fe em forma metálica, átomos compactos.',it:'Fe in forma metallica, atomi compatti.',th:'Fe ในรูปโลหะ อะตอมเรียงชิดกัน'} },
+      { title:{vi:'Oxy hóa bề mặt',en:'Surface oxidation',ja:'表面酸化',zh:'表面氧化',ko:'표면 산화',fr:'Oxydation de surface',es:'Oxidación superficial',de:'Oberflächenoxidation',ru:'Окисление поверхности',pt:'Oxidação superficial',it:'Ossidazione superficiale',th:'การเกิดออกซิเดชันที่ผิว'},
+        desc:{vi:'O2 trong không khí tấn công bề mặt Fe, tạo FeO và Fe2O3.',en:'O2 attacks Fe surface, forming FeO and Fe2O3.',ja:'空気中のO2がFe表面を攻撃し、FeOとFe2O3を形成。',zh:'空气中的O2侵蚀Fe表面，形成FeO和Fe2O3。',ko:'공기 중 O2가 Fe 표면을 공격하여 FeO와 Fe2O3 형성.',fr:'O2 attaque la surface Fe, formant FeO et Fe2O3.',es:'O2 ataca la superficie de Fe, formando FeO y Fe2O3.',de:'O2 greift Fe-Oberfläche an, bildet FeO und Fe2O3.',ru:'O2 атакует поверхность Fe, образуя FeO и Fe2O3.',pt:'O2 ataca a superfície do Fe, formando FeO e Fe2O3.',it:'O2 attacca la superficie Fe, formando FeO e Fe2O3.',th:'O2 โจมตีผิว Fe เกิด FeO และ Fe2O3'} },
+      { title:{vi:'Hình thành lớp gỉ',en:'Rust layer forms',ja:'錆層の形成',zh:'形成锈层',ko:'녹층 형성',fr:'Couche de rouille',es:'Capa de óxido',de:'Rostschicht',ru:'Образуется слой ржавчины',pt:'Camada de ferrugem',it:'Strato di ruggine',th:'เกิดชั้นสนิม'},
+        desc:{vi:'Fe2O3·nH2O kết tủa thành lớp xốp màu nâu đỏ, không bảo vệ được sắt bên trong.',en:'Fe2O3·nH2O precipitates as porous red-brown layer, does not protect inner iron.',ja:'Fe2O3·nH2Oが多孔質の赤褐色層として沈殿、内部の鉄を保護しない。',zh:'Fe2O3·nH2O沉淀为多孔红棕色层，不保护内部铁。',ko:'Fe2O3·nH2O가 다공성 적갈색 층으로 침전, 내부 철 보호 못함.',fr:'Fe2O3·nH2O précipite en couche poreuse brun-rouge, ne protège pas le fer interne.',es:'Fe2O3·nH2O precipita como capa porosa rojo-marrón, no protege el hierro interior.',de:'Fe2O3·nH2O fällt als poröse rotbraune Schicht aus, schützt inneres Eisen nicht.',ru:'Fe2O3·nH2O осаждается пористым красно-коричневым слоем, не защищает внутреннее железо.',pt:'Fe2O3·nH2O precipita como camada porosa vermelho-acastanhada, não protege o ferro interno.',it:'Fe2O3·nH2O precipita come strato poroso rosso-marrone, non protegge il ferro interno.',th:'Fe2O3·nH2O ตกตะกอนเป็นชั้นพรุนสีน้ำตาลแดง ไม่ปกป้องเหล็กภายใน'} }
+    ]
+  },
+  'H2O': {
+    title:{ vi:'Sự hình thành nước', en:'Formation of water',
+            ja:'水の生成', zh:'水的形成', ko:'물의 생성',
+            fr:'Formation de l\'eau', es:'Formación del agua',
+            de:'Bildung von Wasser', ru:'Образование воды',
+            pt:'Formação de água', it:'Formazione dell\'acqua', th:'การเกิดน้ำ' },
+    equation:'2H2 + O2 → 2H2O',
+    steps:[
+      { title:{vi:'Phân tử H2 và O2',en:'H2 and O2 molecules',ja:'H2とO2分子',zh:'H2和O2分子',ko:'H2와 O2 분자',fr:'Molécules H2 et O2',es:'Moléculas H2 y O2',de:'H2- und O2-Moleküle',ru:'Молекулы H2 и O2',pt:'Moléculas H2 e O2',it:'Molecole H2 e O2',th:'โมเลกุล H2 และ O2'},
+        desc:{vi:'Hydro và oxy ở dạng phân tử 2 nguyên tử liên kết cộng hóa trị.',en:'Hydrogen and oxygen as diatomic molecules with covalent bonds.',ja:'水素と酸素は共有結合の二原子分子。',zh:'氢和氧为共价双原子分子。',ko:'수소와 산소는 공유결합 이원자 분자.',fr:'Hydrogène et oxygène en molécules diatomiques covalentes.',es:'Hidrógeno y oxígeno como moléculas diatómicas covalentes.',de:'Wasserstoff und Sauerstoff als kovalente zweiatomige Moleküle.',ru:'Водород и кислород как ковалентные двухатомные молекулы.',pt:'Hidrogênio e oxigênio como moléculas diatômicas covalentes.',it:'Idrogeno e ossigeno come molecole biatomiche covalenti.',th:'ไฮโดรเจนและออกซิเจนเป็นโมเลกุลไดอะตอมิกโคเวเลนต์'} },
+      { title:{vi:'Phá vỡ liên kết',en:'Bond breaking',ja:'結合の切断',zh:'断键',ko:'결합 파괴',fr:'Rupture des liaisons',es:'Ruptura de enlaces',de:'Bindungsbruch',ru:'Разрыв связей',pt:'Quebra de ligações',it:'Rottura dei legami',th:'การแตกพันธะ'},
+        desc:{vi:'Năng lượng (tia lửa) phá vỡ liên kết H–H và O=O thành nguyên tử tự do.',en:'Energy (spark) breaks H–H and O=O bonds into free atoms.',ja:'エネルギー（火花）がH–HとO=O結合を切断し自由原子に。',zh:'能量（火花）断裂H–H和O=O键为自由原子。',ko:'에너지(불꽃)가 H–H와 O=O 결합을 끊어 자유 원자로.',fr:'L\'énergie (étincelle) casse les liaisons H–H et O=O en atomes libres.',es:'La energía (chispa) rompe enlaces H–H y O=O en átomos libres.',de:'Energie (Funke) bricht H–H- und O=O-Bindungen in freie Atome.',ru:'Энергия (искра) разрывает связи H–H и O=O на свободные атомы.',pt:'Energia (faísca) quebra ligações H–H e O=O em átomos livres.',it:'Energia (scintilla) rompe i legami H–H e O=O in atomi liberi.',th:'พลังงาน (ประกาย) ทำให้พันธะ H–H และ O=O แตกเป็นอะตอมอิสระ'} },
+      { title:{vi:'Tái kết hợp',en:'Recombination',ja:'再結合',zh:'再结合',ko:'재결합',fr:'Recombinaison',es:'Recombinación',de:'Rekombination',ru:'Рекомбинация',pt:'Recombinação',it:'Ricombinazione',th:'การรวมตัวใหม่'},
+        desc:{vi:'2H + O → H2O. Nguyên tử O hút 2 electron, tạo liên kết cộng hóa trị phân cực.',en:'2H + O → H2O. O attracts 2 electrons, polar covalent bond.',ja:'2H + O → H2O。Oが2電子を引き付け、極性共有結合。',zh:'2H + O → H2O。O吸引2个电子，形成极性共价键。',ko:'2H + O → H2O. O가 2전자를 끌어당겨 극성 공유결합.',fr:'2H + O → H2O. O attire 2 électrons, liaison covalente polaire.',es:'2H + O → H2O. O atrae 2 electrones, enlace covalente polar.',de:'2H + O → H2O. O zieht 2 Elektronen an, polare kovalente Bindung.',ru:'2H + O → H2O. O притягивает 2 электрона, полярная ковалентная связь.',pt:'2H + O → H2O. O atrai 2 elétrons, ligação covalente polar.',it:'2H + O → H2O. O attrae 2 elettroni, legame covalente polare.',th:'2H + O → H2O อะตอม O ดึง 2 อิเล็กตรอน เกิดพันธะโคเวเลนต์มีขั้ว'} },
+      { title:{vi:'Giải phóng năng lượng',en:'Energy released',ja:'エネルギー放出',zh:'释放能量',ko:'에너지 방출',fr:'Énergie libérée',es:'Energía liberada',de:'Energie freigesetzt',ru:'Выделение энергии',pt:'Energia liberada',it:'Energia rilasciata',th:'ปล่อยพลังงาน'},
+        desc:{vi:'Phản ứng tỏa nhiệt mạnh, có thể gây nổ.',en:'Strongly exothermic, can cause explosion.',ja:'強い発熱、爆発の可能性。',zh:'强烈放热，可能爆炸。',ko:'강한 발열, 폭발 가능.',fr:'Fortement exothermique, peut exploser.',es:'Fuertemente exotérmico, puede explotar.',de:'Stark exotherm, kann explodieren.',ru:'Сильно экзотермическая, может взорваться.',pt:'Fortemente exotérmica, pode explodir.',it:'Fortemente esotermica, può esplodere.',th:'คายความร้อนสูง อาจระเบิด'} }
+    ]
+  }
+};
+
+/* ============================================================
+   STATE
+============================================================ */
+let currentView = 'ball';
+let currentParsed = null;
+let currentFormula = '';
+let rotating = false;
+let slowGenActive = false;
+const atomMeshes = [];
+let currentBounds = 8;
+
+/* ============================================================
+   PARSER
+============================================================ */
+function parseFormula(formula) {
+  formula = formula.replace(/\s+/g, '');
+  if (formula.includes('+')) {
+    const parts = formula.split('+').filter(p => p.length > 0);
+    const groups = [];
+    for (const p of parts) {
+      const parsed = parseSingleMolecule(p);
+      if (!parsed) return null;
+      groups.push(parsed);
+    }
+    return { type:'reaction', groups, formula };
+  }
+  const isIon = formula.endsWith('+') || formula.endsWith('-');
+  const clean = formula.replace(/[+-]$/, '');
+  const parsed = parseSingleMolecule(clean);
+  if (!parsed) return null;
+  parsed.ion = isIon ? (formula.endsWith('+') ? '+' : '-') : null;
+  return { type:'molecule', ...parsed, formula };
+}
+
+function parseSingleMolecule(str) {
+  const atoms = [];
+  function process(s, mult = 1) {
+    let i = 0;
+    while (i < s.length) {
+      const ch = s[i];
+      if (ch === '(') {
+        let depth = 1, j = i + 1;
+        while (j < s.length && depth > 0) {
+          if (s[j] === '(') depth++;
+          else if (s[j] === ')') depth--;
+          j++;
+        }
+        const inside = s.substring(i + 1, j - 1);
+        let numStr = '';
+        while (j < s.length && /\d/.test(s[j])) { numStr += s[j]; j++; }
+        process(inside, mult * (numStr ? parseInt(numStr) : 1));
+        i = j; continue;
+      }
+      if (/[A-Z]/.test(ch)) {
+        let sym = ch;
+        if (i + 1 < s.length && /[a-z]/.test(s[i + 1])) { sym += s[i + 1]; i++; }
+        let numStr = '';
+        while (i + 1 < s.length && /\d/.test(s[i + 1])) { numStr += s[i + 1]; i++; }
+        const cnt = (numStr ? parseInt(numStr) : 1) * mult;
+        for (let k = 0; k < cnt; k++) atoms.push(sym);
+        i++; continue;
+      }
+      i++;
+    }
+  }
+  process(str);
+  if (atoms.length === 0) return null;
+  for (const a of atoms) if (!ELEMENTS[a]) return null;
+  return { atoms };
+}
+
+function findSubstance(input) {
+  const raw = input.trim();
+  if (!raw) return null;
+  const norm = normalize(raw);
+  if (SUBSTANCES[norm]) return SUBSTANCES[norm];
+  // Giữ nguyên nếu là phản ứng có +
+  if (raw.includes('+')) {
+    return raw.replace(/\s+/g,'');
+  }
+  if (ELEMENTS[raw]) return raw;
+  if (raw.length <= 2) {
+    const cap = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    if (ELEMENTS[cap]) return cap;
+  }
+  let c = raw.replace(/\s+/g, '');
+  if (/^[a-z]/.test(c)) c = c.replace(/([a-z])([A-Z]?)/g, (m,a,b) => a.toUpperCase()+b);
+  c = c.replace(/[^A-Za-z0-9+\-()]/g, '');
+  return c || null;
+}
+
+/* ============================================================
+   THREE.JS SETUP
+============================================================ */
+const canvas = document.getElementById('canvas3d');
+const wrap = document.getElementById('canvasWrap');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, wrap.clientWidth/wrap.clientHeight, 0.1, 2000);
+camera.position.set(0,0,8);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const l1 = new THREE.PointLight(0xff6b1a, 1.6, 100); l1.position.set(8,8,8); scene.add(l1);
+const l2 = new THREE.PointLight(0xffffff, 0.7, 100); l2.position.set(-8,-8,8); scene.add(l2);
+const l3 = new THREE.PointLight(0x4080ff, 0.5, 100); l3.position.set(0,-8,-8); scene.add(l3);
+let moleculeGroup = new THREE.Group();
+scene.add(moleculeGroup);
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+/* ============================================================
+   MESH CREATORS
+============================================================ */
+function createAtomMesh(sym, r) {
+  const el = ELEMENTS[sym];
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 32, 32),
+    new THREE.MeshPhongMaterial({ color:el.color, emissive:el.color, emissiveIntensity:0.22, shininess:100 })
+  );
+  mesh.userData.symbol = sym;
+  mesh.userData.type = 'atom';
+  return mesh;
+}
+function createWireAtom(sym, r) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(r, 16, 16),
+    new THREE.MeshBasicMaterial({ color:ELEMENTS[sym].color, wireframe:true, transparent:true, opacity:0.75 })
+  );
+  mesh.userData.symbol = sym;
+  mesh.userData.type = 'atom';
+  return mesh;
+}
+function createBondMesh(p1, p2, radius = 0.07, color = 0x666666) {
+  const s = new THREE.Vector3(...p1), e = new THREE.Vector3(...p2);
+  const d = s.distanceTo(e);
+  const cyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, d, 12),
+    new THREE.MeshPhongMaterial({ color, emissive:0x111111, shininess:80 })
+  );
+  cyl.position.copy(s.clone().add(e).multiplyScalar(0.5));
+  cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), e.clone().sub(s).normalize());
+  return cyl;
+}
+function buildNucleus(sym, center, scale = 1) {
+  const el = ELEMENTS[sym];
+  const grp = new THREE.Group();
+  grp.position.set(...center);
+  const total = el.Z + el.N;
+  const disp = Math.min(total, 60);
+  const nr = 0.075 * scale;
+  const cr = 0.15 + Math.cbrt(total) * 0.07 * scale;
+  for (let i = 0; i < disp; i++) {
+    const isP = i < Math.min(el.Z, disp);
+    const color = isP ? 0xff3333 : 0x3399ff;
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(nr, 12, 12),
+      new THREE.MeshPhongMaterial({ color, emissive:color, emissiveIntensity:0.55, shininess:100 })
+    );
+    const phi = Math.acos(1 - 2*(i+0.5)/disp);
+    const theta = Math.PI * (1+Math.sqrt(5)) * i;
+    m.position.set(cr*Math.sin(phi)*Math.cos(theta), cr*Math.cos(phi), cr*Math.sin(phi)*Math.sin(theta));
+    m.userData.symbol = sym;
+    m.userData.type = 'nucleon';
+    grp.add(m);
+  }
+  return grp;
+}
+function buildElectronShells(sym, center, scale = 1) {
+  const el = ELEMENTS[sym];
+  const grp = new THREE.Group();
+  grp.position.set(...center);
+  el.shells.forEach((eCount, si) => {
+    const r = (0.35 + si*0.32)*scale;
+    const orbit = new THREE.Mesh(
+      new THREE.TorusGeometry(r, 0.008, 8, 64),
+      new THREE.MeshBasicMaterial({ color:0xff6b1a, transparent:true, opacity:0.35 })
+    );
+    orbit.rotation.x = Math.PI/2;
+    orbit.rotation.z = si*0.4;
+    grp.add(orbit);
+    const disp = Math.min(eCount, 8);
+    for (let i = 0; i < disp; i++) {
+      const e = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055*scale, 12, 12),
+        new THREE.MeshPhongMaterial({ color:0x00d4ff, emissive:0x00d4ff, emissiveIntensity:1.2, shininess:100 })
+      );
+      const a = (i/disp)*Math.PI*2;
+      e.position.set(Math.cos(a)*r, Math.sin(a)*r*(si%2===0?1:-1)*0.3, Math.sin(a)*r);
+      e.userData.symbol = sym;
+      e.userData.type = 'electron';
+      e.userData.orbitR = r;
+      e.userData.orbitAngle = a;
+      e.userData.orbitSpeed = 0.015 + si*0.005;
+      e.userData.orbitTilt = si*0.4;
+      grp.add(e);
+    }
+  });
+  return grp;
+}
+function buildElectronCloud(sym, center, scale = 1) {
+  const el = ELEMENTS[sym];
+  const grp = new THREE.Group();
+  grp.position.set(...center);
+  el.shells.forEach((eCount, si) => {
+    const r = (0.35 + si*0.32)*scale;
+    const cnt = 30 + eCount*12;
+    for (let i = 0; i < cnt; i++) {
+      const phi = Math.acos(1-2*Math.random());
+      const theta = Math.random()*Math.PI*2;
+      const rr = r*(0.85+Math.random()*0.3);
+      const m = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025*scale, 6, 6),
+        new THREE.MeshBasicMaterial({ color:0x00d4ff, transparent:true, opacity:0.5 })
+      );
+      m.position.set(rr*Math.sin(phi)*Math.cos(theta), rr*Math.cos(phi), rr*Math.sin(phi)*Math.sin(theta));
+      m.userData.cloudBase = m.position.clone();
+      m.userData.cloudPhase = Math.random()*Math.PI*2;
+      grp.add(m);
+    }
+  });
+  return grp;
+}
+
+/* ============================================================
+   LAYOUT
+============================================================ */
+function layoutSmart(atoms) {
+  const n = atoms.length;
+  const positions = [];
+  const counts = {};
+  atoms.forEach(a => counts[a] = (counts[a]||0)+1);
+  if (n === 1) return [[0,0,0]];
+  if (n === 2) return [[-0.9,0,0],[0.9,0,0]];
+  if (n === 3) {
+    if (counts['C']===1 && (counts['O']===2 || counts['S']===2)) {
+      return [[-1.3,0,0],[0,0,0],[1.3,0,0]];
+    }
+    const big = atoms.findIndex(a => a !== 'H');
+    const others = atoms.map((a,i)=>i).filter(i=>i!==big);
+    positions[big] = [0,0.35,0];
+    positions[others[0]] = [-1.05,-0.55,0];
+    positions[others[1]] = [1.05,-0.55,0];
+    return positions;
+  }
+  if (n === 4) {
+    let center = atoms.findIndex(a => a !== 'H');
+    if (center === -1) center = 0;
+    const r = 1.4;
+    const tet = [[0,r,0],[0,-r/3,r*0.943],[r*0.816,-r/3,-r*0.471],[-r*0.816,-r/3,-r*0.471]];
+    positions[center] = [0,0,0];
+    const others = [];
+    for (let i = 0; i < 4; i++) if (i !== center) others.push(i);
+    for (let i = 0; i < others.length; i++) positions[others[i]] = tet[i+1] || tet[0];
+    return positions;
+  }
+  let centerIdx = 0, bestScore = -1;
+  for (let i = 0; i < atoms.length; i++) {
+    const a = atoms[i];
+    const score = (counts[a]===1?10:0) + (ELEMENTS[a]?.Z || 0);
+    if (score > bestScore) { bestScore = score; centerIdx = i; }
+  }
+  positions[centerIdx] = [0,0,0];
+  const others = [];
+  for (let i = 0; i < n; i++) if (i !== centerIdx) others.push(i);
+  const r = 1.2 + others.length*0.12;
+  for (let i = 0; i < others.length; i++) {
+    const phi = Math.acos(1-2*(i+0.5)/others.length);
+    const theta = Math.PI*(1+Math.sqrt(5))*i;
+    positions[others[i]] = [r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta)];
+  }
+  return positions;
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
+function renderMolecule(parsed) {
+  currentParsed = parsed;
+  clearMolecule();
+  atomMeshes.length = 0;
+
+  if (parsed.type === 'reaction') {
+    let ox = 0;
+    for (const g of parsed.groups) {
+      const w = buildGroupAt(g, ox);
+      ox += w + 1.2;
+    }
+    moleculeGroup.position.x = -ox/2 + 0.6;
+  } else {
+    buildGroupAt(parsed, 0);
+  }
+
+  const box = new THREE.Box3().setFromObject(moleculeGroup);
+  const size = box.getSize(new THREE.Vector3());
+  currentBounds = Math.max(size.x, size.y, size.z);
+  cameraSpherical.radius = Math.max(4, currentBounds*2.2);
+  updateCameraFromSpherical();
+  moleculeGroup.rotation.set(0,0,0);
+}
+
+function buildGroupAt(parsed, ox) {
+  const positions = layoutSmart(parsed.atoms);
+  const meshes = [];
+  let maxR = 0;
+
+  if (currentView === 'ball' || currentView === 'slice') {
+    for (let i = 0; i < parsed.atoms.length; i++) {
+      const sym = parsed.atoms[i];
+      const r = atomRadius(sym);
+      maxR = Math.max(maxR, r);
+      const m = createAtomMesh(sym, r);
+      m.position.set(positions[i][0]+ox, positions[i][1], positions[i][2]);
+      m.userData.homePos = m.position.clone();
+      moleculeGroup.add(m);
+      meshes.push(m);
+      atomMeshes.push(m);
+    }
+    if (meshes.length >= 2) {
+      let cIdx = 0, best = -1;
+      for (let i = 0; i < parsed.atoms.length; i++) {
+        const a = parsed.atoms[i];
+        const c = parsed.atoms.filter(x=>x===a).length;
+        const s = (c===1?10:0) + (ELEMENTS[a]?.Z||0);
+        if (s > best) { best = s; cIdx = i; }
+      }
+      const br = currentView === 'slice' ? 0.13 : 0.08;
+      for (let i = 0; i < meshes.length; i++) {
+        if (i === cIdx) continue;
+        moleculeGroup.add(createBondMesh(
+          [meshes[cIdx].position.x, meshes[cIdx].position.y, meshes[cIdx].position.z],
+          [meshes[i].position.x, meshes[i].position.y, meshes[i].position.z],
+          br
+        ));
+      }
+    }
+  }
+
+  if (currentView === 'wire') {
+    for (let i = 0; i < parsed.atoms.length; i++) {
+      const sym = parsed.atoms[i];
+      const r = atomRadius(sym);
+      maxR = Math.max(maxR, r);
+      const m = createWireAtom(sym, r);
+      m.position.set(positions[i][0]+ox, positions[i][1], positions[i][2]);
+      m.userData.homePos = m.position.clone();
+      moleculeGroup.add(m);
+      meshes.push(m);
+      atomMeshes.push(m);
+    }
+    for (let i = 1; i < meshes.length; i++) {
+      moleculeGroup.add(createBondMesh(
+        [meshes[0].position.x, meshes[0].position.y, meshes[0].position.z],
+        [meshes[i].position.x, meshes[i].position.y, meshes[i].position.z],
+        0.05, 0xff6b1a
+      ));
+    }
+  }
+
+  if (currentView === 'nucleus') {
+    for (let i = 0; i < parsed.atoms.length; i++) {
+      const sym = parsed.atoms[i];
+      const r = atomRadius(sym);
+      maxR = Math.max(maxR, r);
+      const cx = positions[i][0]+ox, cy = positions[i][1], cz = positions[i][2];
+      const shell = new THREE.Mesh(
+        new THREE.SphereGeometry(r, 20, 20),
+        new THREE.MeshBasicMaterial({ color:ELEMENTS[sym].color, transparent:true, opacity:0.06, wireframe:true })
+      );
+      shell.position.set(cx, cy, cz);
+      moleculeGroup.add(shell);
+      const nuc = buildNucleus(sym, [cx,cy,cz], r/0.65);
+      nuc.traverse(o => {
+        if (o.userData.type === 'nucleon') {
+          o.userData.homePos = o.position.clone().add(nuc.position);
+          atomMeshes.push(o);
+        }
+      });
+      moleculeGroup.add(nuc);
+      if (i > 0) moleculeGroup.add(createBondMesh(
+        [positions[0][0]+ox, positions[0][1], positions[0][2]],
+        [cx, cy, cz], 0.04
+      ));
+    }
+  }
+
+  if (currentView === 'shell') {
+    for (let i = 0; i < parsed.atoms.length; i++) {
+      const sym = parsed.atoms[i];
+      const r = atomRadius(sym);
+      maxR = Math.max(maxR, r);
+      const cx = positions[i][0]+ox, cy = positions[i][1], cz = positions[i][2];
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(r*0.3, 24, 24),
+        new THREE.MeshPhongMaterial({ color:ELEMENTS[sym].color, emissive:ELEMENTS[sym].color, emissiveIntensity:0.6 })
+      );
+      core.position.set(cx, cy, cz);
+      core.userData.symbol = sym;
+      core.userData.type = 'atom';
+      core.userData.homePos = core.position.clone();
+      moleculeGroup.add(core);
+      atomMeshes.push(core);
+      const sh = buildElectronShells(sym, [cx,cy,cz], r/0.65);
+      sh.traverse(o => { if (o.userData.type==='electron') o.userData.homePos = o.position.clone(); });
+      moleculeGroup.add(sh);
+    }
+  }
+
+  if (currentView === 'cloud') {
+    for (let i = 0; i < parsed.atoms.length; i++) {
+      const sym = parsed.atoms[i];
+      const r = atomRadius(sym);
+      maxR = Math.max(maxR, r);
+      const cx = positions[i][0]+ox, cy = positions[i][1], cz = positions[i][2];
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(r*0.18, 16, 16),
+        new THREE.MeshPhongMaterial({ color:ELEMENTS[sym].color, emissive:ELEMENTS[sym].color, emissiveIntensity:0.7 })
+      );
+      core.position.set(cx, cy, cz);
+      core.userData.symbol = sym;
+      core.userData.type = 'atom';
+      core.userData.homePos = core.position.clone();
+      moleculeGroup.add(core);
+      atomMeshes.push(core);
+      const cl = buildElectronCloud(sym, [cx,cy,cz], r/0.65);
+      cl.traverse(o => { if (o.userData.cloudBase) o.userData.homePos = o.position.clone(); });
+      moleculeGroup.add(cl);
+    }
+  }
+  return maxR*2 + 0.5;
+}
+
+function clearMolecule() {
+  scene.remove(moleculeGroup);
+  moleculeGroup.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach(m=>m.dispose());
+      else o.material.dispose();
+    }
+  });
+  moleculeGroup = new THREE.Group();
+  scene.add(moleculeGroup);
+}
+
+function setView(v) {
+  currentView = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  if (currentParsed) renderMolecule(currentParsed);
+}
+
+/* ============================================================
+   INFO PANEL
+============================================================ */
+function showInfo(sym) {
+  if (!ELEMENTS[sym]) return;
+  const el = ELEMENTS[sym];
+  document.getElementById('infoTitle').textContent = sym;
+  document.getElementById('infoBody').innerHTML = `
+    <div class="info-row"><span class="info-label">${t('info_name')}</span><span class="info-value">${elName(sym)}</span></div>
+    <div class="info-row"><span class="info-label">${t('info_en')}</span><span class="info-value">${el.en}</span></div>
+    <div class="info-row"><span class="info-label">${t('info_Z')}</span><span class="info-value">${el.Z}</span></div>
+    <div class="info-row"><span class="info-label">${t('info_N')}</span><span class="info-value">${el.N}</span></div>
+    <div class="info-row"><span class="info-label">${t('info_mass')}</span><span class="info-value">${el.mass} u</span></div>
+    <div class="info-row"><span class="info-label">${t('info_shells')}</span><span class="info-value">${el.shells.join(' · ')}</span></div>
+    <div class="info-row"><span class="info-label">${t('info_total_e')}</span><span class="info-value">${el.shells.reduce((a,b)=>a+b,0)}</span></div>
+  `;
+  document.getElementById('infoPanel').classList.add('show');
+}
+function hideInfo() { document.getElementById('infoPanel').classList.remove('show'); }
+
+/* ============================================================
+   MECHANISM PANEL
+============================================================ */
+let mechData = null;
+let mechStep = 0;
+let mechTimer = null;
+let mechPlaying = false;
+
+function getMechanism(formula) {
+  const clean = formula.replace(/\s+/g,'');
+  // Kiểm tra reaction trước
+  if (MECHANISMS[clean]) return MECHANISMS[clean];
+  // Đảo chiều (O2+CH4 → CH4+O2)
+  if (clean.includes('+')) {
+    const parts = clean.split('+');
+    if (parts.length === 2) {
+      const rev = parts[1]+'+'+parts[0];
+      if (MECHANISMS[rev]) return MECHANISMS[rev];
+    }
+  }
+  // Kiểm tra formation
+  if (FORMATION[clean]) return FORMATION[clean];
+  return null;
+}
+
+function openMech(formula) {
+  const data = getMechanism(formula);
+  if (!data) {
+    document.getElementById('mechBody').innerHTML = `<p style="color:var(--text-dim)">${t('mech_no_steps')}</p>`;
+    document.getElementById('mechProgress').innerHTML = '';
+    document.getElementById('mechPanel').classList.add('show');
+    mechData = null;
+    return;
+  }
+  mechData = data;
+  mechStep = 0;
+  document.getElementById('mechHeaderTitle').textContent = t('mech_header');
+  document.getElementById('mechPanel').classList.add('show');
+  renderMechStep();
+}
+
+function renderMechStep() {
+  if (!mechData) return;
+  const step = mechData.steps[mechStep];
+  const lang = currentLang;
+  const title = step.title[lang] || step.title.vi;
+  const desc = step.desc[lang] || step.desc.vi;
+  const mechTitle = mechData.title[lang] || mechData.title.vi;
+
+  let html = `
+    <div class="mech-title">${mechTitle}</div>
+    <div class="mech-formula">${mechData.equation}</div>
+  `;
+  mechData.steps.forEach((s, i) => {
+    const st = s.title[lang] || s.title.vi;
+    const sd = s.desc[lang] || s.desc.vi;
+    html += `
+      <div class="mech-step ${i === mechStep ? 'active' : ''}" onclick="setMechStep(${i})">
+        <div class="step-title"><span class="step-num">${String(i+1).padStart(2,'0')}</span>${st}</div>
+        ${i === mechStep ? `<div class="step-desc">${sd}</div>` : ''}
+      </div>
+    `;
+  });
+  document.getElementById('mechBody').innerHTML = html;
+
+  // Progress
+  const bars = mechData.steps.map((_, i) =>
+    `<div class="bar ${i <= mechStep ? 'done' : ''}"></div>`
+  ).join('');
+  document.getElementById('mechProgress').innerHTML = bars;
+
+  // Buttons
+  document.getElementById('mechPrev').disabled = mechStep === 0;
+  document.getElementById('mechNext').disabled = mechStep === mechData.steps.length - 1;
+  document.getElementById('mechPlay').textContent = mechPlaying ? t('mech_pause') : t('mech_play');
+}
+
+function setMechStep(i) {
+  if (!mechData || i < 0 || i >= mechData.steps.length) return;
+  mechStep = i;
+  renderMechStep();
+  // Animate: highlight atom tương ứng — chỉ hiệu ứng visual
+  animateMechStep();
+}
+
+function animateMechStep() {
+  // Visual: làm sáng nhẹ atom tương ứng — có thể mở rộng sau
+  if (!moleculeGroup) return;
+}
+
+function mechPrev() { setMechStep(mechStep - 1); }
+function mechNext() { setMechStep(mechStep + 1); }
+function mechPlayPause() {
+  if (!mechData) return;
+  mechPlaying = !mechPlaying;
+  if (mechPlaying) {
+    mechTimer = setInterval(() => {
+      if (mechStep >= mechData.steps.length - 1) {
+        mechPlaying = false;
+        clearInterval(mechTimer);
+        renderMechStep();
+      } else {
+        mechNext();
+      }
+    }, 2800);
+  } else {
+    clearInterval(mechTimer);
+  }
+  renderMechStep();
+}
+function closeMech() {
+  document.getElementById('mechPanel').classList.remove('show');
+  if (mechTimer) clearInterval(mechTimer);
+  mechPlaying = false;
+}
+
+function toggleMechFromBtn() {
+  if (document.getElementById('mechPanel').classList.contains('show')) {
+    closeMech();
+  } else {
+    openMech(currentFormula);
+  }
+}
+
+/* ============================================================
+   CAMERA
+============================================================ */
+let isDragging = false;
+let prevMouse = { x:0, y:0 };
+const cameraTarget = new THREE.Vector3(0,0,0);
+const cameraSpherical = { theta:0, phi:Math.PI/2, radius:8 };
+function updateCameraFromSpherical() {
+  camera.position.x = cameraSpherical.radius * Math.sin(cameraSpherical.phi) * Math.sin(cameraSpherical.theta);
+  camera.position.y = cameraSpherical.radius * Math.cos(cameraSpherical.phi);
+  camera.position.z = cameraSpherical.radius * Math.sin(cameraSpherical.phi) * Math.cos(cameraSpherical.theta);
+  camera.lookAt(cameraTarget);
+}
+updateCameraFromSpherical();
+
+function onPointerDown(e) {
+  if (e.target.closest('.info-panel') || e.target.closest('.mech-panel')) return;
+  isDragging = true;
+  prevMouse.x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+  prevMouse.y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+}
+function onPointerMove(e) {
+  if (!isDragging) return;
+  const x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+  const y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+  cameraSpherical.theta -= (x - prevMouse.x) * 0.005;
+  cameraSpherical.phi -= (y - prevMouse.y) * 0.005;
+  cameraSpherical.phi = Math.max(0.1, Math.min(Math.PI-0.1, cameraSpherical.phi));
+  prevMouse.x = x; prevMouse.y = y;
+  updateCameraFromSpherical();
+}
+function onPointerUp() { isDragging = false; }
+function onWheel(e) {
+  e.preventDefault();
+  cameraSpherical.radius *= (1 + Math.sign(e.deltaY) * 0.1);
+  const minR = Math.max(1, currentBounds*0.5);
+  const maxR = Math.max(20, currentBounds*6);
+  cameraSpherical.radius = Math.max(minR, Math.min(maxR, cameraSpherical.radius));
+  updateCameraFromSpherical();
+}
+
+let pinchStartDist = 0, pinchStartRadius = 8;
+function getPinchDist(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+wrap.addEventListener('mousedown', onPointerDown);
+wrap.addEventListener('mousemove', onPointerMove);
+wrap.addEventListener('mouseup', onPointerUp);
+wrap.addEventListener('mouseleave', onPointerUp);
+wrap.addEventListener('wheel', onWheel, { passive:false });
+wrap.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    pinchStartDist = getPinchDist(e.touches);
+    pinchStartRadius = cameraSpherical.radius;
+  } else if (e.touches.length === 1) onPointerDown(e);
+}, { passive:false });
+wrap.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const d = getPinchDist(e.touches);
+    cameraSpherical.radius = pinchStartRadius * (pinchStartDist / d);
+    const minR = Math.max(1, currentBounds*0.5);
+    const maxR = Math.max(20, currentBounds*6);
+    cameraSpherical.radius = Math.max(minR, Math.min(maxR, cameraSpherical.radius));
+    updateCameraFromSpherical();
+  } else if (e.touches.length === 1 && isDragging) onPointerMove(e);
+}, { passive:false });
+wrap.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0) onPointerUp();
+});
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left)/rect.width)*2-1;
+  mouse.y = -((e.clientY - rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(atomMeshes, false);
+  if (hits.length > 0 && hits[0].object.userData.symbol) showInfo(hits[0].object.userData.symbol);
+  else hideInfo();
+});
+
+/* ============================================================
+   ACTIONS
+============================================================ */
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function handleSearch(input) {
+  const raw = input.trim();
+  if (!raw) return;
+  hideSuggestions();
+  const formula = findSubstance(raw);
+  if (!formula) {
+    showToast(t('notFound') + raw);
+    return;
+  }
+  const parsed = parseFormula(formula);
+  if (!parsed) {
+    showToast(t('notFound') + raw);
+    return;
+  }
+  currentFormula = formula.replace(/\s+/g,'');
+  renderMolecule(parsed);
+  document.getElementById('emptyState').classList.add('hide');
+  const hint = document.getElementById('hint');
+  hint.classList.remove('hide');
+  setTimeout(() => hint.classList.add('hide'), 5000);
+  cameraSpherical.theta = 0;
+  cameraSpherical.phi = Math.PI/2;
+  updateCameraFromSpherical();
+
+  // Hiện nút cơ chế/phản ứng nếu có
+  const btn = document.getElementById('btnMech');
+  const mech = getMechanism(currentFormula);
+  if (mech) {
+    btn.style.display = '';
+    btn.textContent = currentFormula.includes('+') ? t('btn_reaction') : t('btn_mech');
+    btn.classList.add('highlight');
+  } else {
+    btn.style.display = 'none';
+    btn.classList.remove('highlight');
+  }
+  closeMech();
+}
+
+function quickSearch(f) {
+  document.getElementById('formulaInput').value = f;
+  document.getElementById('searchBox').classList.add('has-value');
+  handleSearch(f);
+  if (document.getElementById('sidebar').classList.contains('open')) toggleMenu();
+}
+
+function clearInput() {
+  document.getElementById('formulaInput').value = '';
+  document.getElementById('searchBox').classList.remove('has-value');
+  hideSuggestions();
+}
+
+function goHome() {
+  clearInput();
+  clearMolecule();
+  currentParsed = null;
+  currentFormula = '';
+  atomMeshes.length = 0;
+  document.getElementById('emptyState').classList.remove('hide');
+  document.getElementById('btnMech').style.display = 'none';
+  hideInfo();
+  closeMech();
+  toggleMenu();
+}
+
+function toggleRotate() {
+  rotating = !rotating;
+  const btn = document.getElementById('btnRotate');
+  btn.textContent = rotating ? t('rotateOn') : t('rotateOff');
+  btn.classList.toggle('active', rotating);
+}
+
+function resetView() {
+  moleculeGroup.rotation.set(0,0,0);
+  cameraSpherical.radius = Math.max(4, currentBounds*2.2);
+  cameraSpherical.theta = 0;
+  cameraSpherical.phi = Math.PI/2;
+  updateCameraFromSpherical();
+}
+
+function slowGen() {
+  const atoms = [];
+  moleculeGroup.traverse(o => {
+    if (o.userData && o.userData.homePos) {
+      o.position.copy(o.userData.homePos.clone().multiplyScalar(4));
+      atoms.push(o);
+    }
+  });
+  if (atoms.length === 0) { showToast('Chưa có phân tử để chạy SlowGen'); return; }
+  slowGenActive = true;
+}
+
+function screenshot() {
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'dhk-molecule.png';
+  a.click();
+}
+
+function toggleMenu() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+function toggleAcc(headerEl) {
+  const item = headerEl.parentElement;
+  document.querySelectorAll('.acc-item').forEach(el => { if (el !== item) el.classList.remove('open'); });
+  item.classList.toggle('open');
+}
+
+/* ============================================================
+   AUTOCOMPLETE
+============================================================ */
+const SUGGEST_LIST = [
+  { display:'H2O', sub:'Nước / Water' },
+  { display:'CH4', sub:'Metan / Methane' },
+  { display:'CO2', sub:'Cacbon dioxit' },
+  { display:'NH3', sub:'Amoniac' },
+  { display:'NaCl', sub:'Muối ăn' },
+  { display:'C6H6', sub:'Benzen' },
+  { display:'H2SO4', sub:'Axit sunfuric' },
+  { display:'HCl', sub:'Axit clohidric' },
+  { display:'NaOH', sub:'Xút' },
+  { display:'CaCO3', sub:'Đá vôi' },
+  { display:'Fe2O3', sub:'Oxit sắt / Gỉ sắt' },
+  { display:'C6H12O6', sub:'Glucozo' },
+  { display:'C2H5OH', sub:'Etanol' },
+  { display:'CH4+O2', sub:'Đốt metan' },
+  { display:'Fe+O2', sub:'Sắt gỉ' },
+  { display:'HCl+NaOH', sub:'Trung hòa' },
+  { display:'Au', sub:'Vàng / Gold' },
+  { display:'Fe', sub:'Sắt / Iron' },
+  { display:'Cu', sub:'Đồng / Copper' },
+  { display:'Ag', sub:'Bạc / Silver' },
+  { display:'Al', sub:'Nhôm / Aluminium' },
+  { display:'U', sub:'Urani / Uranium' }
+];
+const formulaInput = document.getElementById('formulaInput');
+const searchBox = document.getElementById('searchBox');
+const suggestionsEl = document.getElementById('suggestions');
+
+function showSuggestions(query) {
+  const q = normalize(query);
+  if (!q) { hideSuggestions(); return; }
+  const matches = SUGGEST_LIST.filter(s =>
+    normalize(s.display).includes(q) || normalize(s.sub).includes(q)
+  ).slice(0, 8);
+  if (matches.length === 0) { hideSuggestions(); return; }
+  suggestionsEl.innerHTML = matches.map(m =>
+    `<div class="sug-item" onclick="pickSuggestion('${m.display}')">
+       <span>${m.sub}</span><span class="sug-formula">${m.display}</span>
+     </div>`
+  ).join('');
+  suggestionsEl.classList.add('show');
+}
+function pickSuggestion(f) {
+  formulaInput.value = f;
+  searchBox.classList.add('has-value');
+  hideSuggestions();
+  handleSearch(f);
+}
+function hideSuggestions() { suggestionsEl.classList.remove('show'); }
+
+formulaInput.addEventListener('input', (e) => {
+  searchBox.classList.toggle('has-value', e.target.value.length > 0);
+  showSuggestions(e.target.value);
+});
+formulaInput.addEventListener('focus', (e) => { if (e.target.value) showSuggestions(e.target.value); });
+formulaInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { handleSearch(e.target.value); e.target.blur(); }
+  else if (e.key === 'Escape') hideSuggestions();
+});
+document.addEventListener('click', (e) => {
+  if (!searchBox.contains(e.target)) hideSuggestions();
+});
+
+/* ============================================================
+   PERIODIC TABLE GRID
+============================================================ */
+function buildPeriodicTable() {
+  const grid = document.getElementById('ptableGrid');
+  let html = '';
+  for (const [sym, el] of Object.entries(ELEMENTS)) {
+    html += `<div class="ptable-cell" onclick="quickSearch('${sym}')" title="${elName(sym)} / ${el.en}">
+      <span class="z">${el.Z}</span><span class="sym">${sym}</span>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+/* ============================================================
+   RESIZE
+============================================================ */
+window.addEventListener('resize', () => {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+
+/* ============================================================
+   ANIMATION LOOP
+============================================================ */
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.016;
+  if (rotating) moleculeGroup.rotation.y += 0.005;
+  if (slowGenActive) {
+    let done = true;
+    moleculeGroup.traverse(o => {
+      if (o.userData && o.userData.homePos) {
+        o.position.lerp(o.userData.homePos, 0.06);
+        if (o.position.distanceTo(o.userData.homePos) > 0.02) done = false;
+      }
+    });
+    if (done) slowGenActive = false;
+  }
+  moleculeGroup.traverse(o => {
+    if (o.userData && o.userData.type === 'electron') {
+      o.userData.orbitAngle += o.userData.orbitSpeed;
+      const r = o.userData.orbitR, a = o.userData.orbitAngle, tilt = o.userData.orbitTilt;
+      const x = Math.cos(a)*r, z = Math.sin(a)*r, y = Math.sin(a)*r*0.3;
+      o.position.x = x*Math.cos(tilt) - z*Math.sin(tilt);
+      o.position.z = x*Math.sin(tilt) + z*Math.cos(tilt);
+      o.position.y = y;
+    }
+    if (o.userData && o.userData.cloudBase) {
+      const b = o.userData.cloudBase, ph = o.userData.cloudPhase;
+      o.position.x = b.x + Math.sin(time*2+ph)*0.04;
+      o.position.y = b.y + Math.cos(time*1.7+ph)*0.04;
+      o.position.z = b.z + Math.sin(time*2.3+ph)*0.04;
+    }
+  });
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ============================================================
+   LANGUAGE — FULL UPDATE
+============================================================ */
+function populateLangSelect() {
+  const sel = document.getElementById('langSelect');
+  sel.innerHTML = '';
+  for (const [code, data] of Object.entries(LANGS)) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = data.label;
+    sel.appendChild(opt);
+  }
+  sel.value = currentLang;
+}
+
+function applyI18n() {
+  // Input + empty
+  formulaInput.placeholder = t('placeholder');
+  document.getElementById('emptyMsg').textContent = t('empty');
+  document.getElementById('menuTitle').textContent = t('menu');
+  document.getElementById('hint').textContent = t('hint');
+  // Rotate button
+  document.getElementById('btnRotate').textContent = rotating ? t('rotateOn') : t('rotateOff');
+  // Mech button
+  const mechBtn = document.getElementById('btnMech');
+  if (mechBtn.style.display !== 'none' && currentFormula) {
+    mechBtn.textContent = currentFormula.includes('+') ? t('btn_reaction') : t('btn_mech');
+  }
+  // View tabs
+  document.querySelectorAll('.view-tab').forEach(tab => {
+    const k = tab.dataset.i18n;
+    if (k) tab.textContent = t(k);
+  });
+  // Toolbar — các nút có data-i18n
+  document.querySelectorAll('.tool-btn[data-i18n]').forEach(btn => {
+    btn.textContent = t(btn.dataset.i18n);
+  });
+  // Menu accordion headers
+  document.querySelectorAll('.acc-header span[data-i18n]').forEach(s => {
+    s.textContent = t(s.dataset.i18n);
+  });
+  document.querySelectorAll('.acc-body-inner p[data-i18n]').forEach(p => {
+    p.textContent = t(p.dataset.i18n);
+  });
+  // Guide body — rebuild
+  const guideBody = document.getElementById('guideBody');
+  guideBody.innerHTML = `
+    <p>${t('guide_1')}</p>
+    <p><span class="key">H2O</span> · <span class="key">nước</span> · <span class="key">water</span></p>
+    <p><span class="key">Fe2O3</span> · <span class="key">gỉ sắt</span></p>
+    <p>${t('guide_2')}</p>
+    <p style="color:var(--orange-soft)">${t('guide_3')}</p>
+    <p style="color:var(--orange-soft)">${t('guide_4')}</p>
+    <p style="margin-top:12px"><b style="color:var(--text)">${t('guide_views')}</b></p>
+    <p>${t('view_ball')}</p>
+    <p>${t('view_wire')}</p>
+    <p>${t('view_nucleus')}</p>
+    <p>${t('view_shell')}</p>
+    <p>${t('view_cloud')}</p>
+    <p>${t('view_slice')}</p>
+  `;
+  // Periodic table hint
+  const pth = document.querySelector('.acc-body-inner p[data-i18n="periodic_hint"]');
+  if (pth) pth.textContent = t('periodic_hint');
+  // Info panel — nếu đang mở, refresh
+  if (document.getElementById('infoPanel').classList.contains('show')) {
+    const titleEl = document.getElementById('infoTitle');
+    if (titleEl && ELEMENTS[titleEl.textContent]) showInfo(titleEl.textContent);
+  }
+  // Mech panel — nếu đang mở, refresh
+  if (document.getElementById('mechPanel').classList.contains('show')) {
+    document.getElementById('mechHeaderTitle').textContent = t('mech_header');
+    if (mechData) renderMechStep();
+    else document.getElementById('mechBody').innerHTML = `<p style="color:var(--text-dim)">${t('mech_no_steps')}</p>`;
+  }
+}
+
+function changeLang(lang) {
+  currentLang = lang;
+  applyI18n();
+  buildPeriodicTable(); // rebuild tooltips
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+populateLangSelect();
+applyI18n();
+buildPeriodicTable();
+// Đảm bảo nút xoay ban đầu
+document.getElementById('btnRotate').textContent = t('rotateOff');
+</script>
+</body>
+</html>
